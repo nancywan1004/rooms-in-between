@@ -43,7 +43,7 @@ export class Game {
     this.renderer.setSize(window.innerWidth, window.innerHeight)
     this.renderer.outputColorSpace = THREE.SRGBColorSpace
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
-    this.renderer.toneMappingExposure = 1.05
+    this.renderer.toneMappingExposure = 0.92
     this.renderer.shadowMap.enabled = true
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
     container.appendChild(this.renderer.domElement)
@@ -51,11 +51,11 @@ export class Game {
     this.player = new PlayerController(window.innerWidth / window.innerHeight)
     this.player.setSpawn(officeLayout.spawn.x, officeLayout.spawn.z, officeLayout.spawn.yaw)
 
-    this.hemi = new THREE.HemisphereLight(0xf5efe6, 0xc8bfb2, 0.55)
+    this.hemi = new THREE.HemisphereLight(0xd8dde2, 0x6a6864, 0.32)
     this.scene.add(this.hemi)
 
-    this.sun = new THREE.DirectionalLight(0xfff6ea, 0.85)
-    this.sun.position.set(8, 18, 6)
+    this.sun = new THREE.DirectionalLight(0xe4eaf0, 0.35)
+    this.sun.position.set(4, 16, 2)
     this.sun.castShadow = true
     this.sun.shadow.mapSize.set(2048, 2048)
     this.sun.shadow.camera.near = 1
@@ -64,11 +64,12 @@ export class Game {
     this.sun.shadow.camera.right = 20
     this.sun.shadow.camera.top = 20
     this.sun.shadow.camera.bottom = -20
+    this.sun.shadow.bias = -0.0002
     this.scene.add(this.sun)
 
-    // Soft key RectAreaLight over open office
-    const rect = new THREE.RectAreaLight(0xfff5ea, 2.5, 10, 8)
-    rect.position.set(0, 3.2, 0)
+    // Cool overhead fill — fluorescent wash
+    const rect = new THREE.RectAreaLight(0xe8eef2, 1.8, 12, 10)
+    rect.position.set(0, 3.25, 0)
     rect.lookAt(0, 0, 0)
     this.scene.add(rect)
 

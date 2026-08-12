@@ -1,12 +1,111 @@
 import * as THREE from 'three'
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js'
 import { getMaterial } from '../theme/materials'
+import { crtScreenTexture, noticeBoardTexture } from '../theme/textures'
 import type { ColliderWorld } from './colliders'
 
 let seq = 0
 const nid = (p: string) => `${p}_${++seq}`
 
-/** Desk 1.4 × 0.7m, pivot floor-contact center */
+function addCrtMonitor(parent: THREE.Object3D, x: number, y: number, z: number): void {
+  const bezel = new THREE.Mesh(
+    new RoundedBoxGeometry(0.42, 0.36, 0.32, 3, 0.025),
+    getMaterial('MAT_BEIGE_TECH', { roughness: 0.55 }),
+  )
+  bezel.position.set(x, y, z)
+  bezel.castShadow = true
+  parent.add(bezel)
+
+  const screen = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.32, 0.24),
+    new THREE.MeshStandardMaterial({
+      map: crtScreenTexture(),
+      emissive: 0x1a4030,
+      emissiveIntensity: 0.55,
+      roughness: 0.4,
+    }),
+  )
+  screen.position.set(x, y + 0.02, z + 0.165)
+  parent.add(screen)
+
+  const stand = new THREE.Mesh(
+    new RoundedBoxGeometry(0.22, 0.06, 0.18, 1, 0.01),
+    getMaterial('MAT_BEIGE_TECH', { roughness: 0.55 }),
+  )
+  stand.position.set(x, y - 0.2, z)
+  parent.add(stand)
+
+  const neck = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.03, 0.04, 0.08, 8),
+    getMaterial('MAT_STEEL', { roughness: 0.45, metalness: 0.3 }),
+  )
+  neck.position.set(x, y - 0.15, z)
+  parent.add(neck)
+}
+
+function addDeskLamp(parent: THREE.Object3D, x: number, y: number, z: number): THREE.PointLight {
+  const base = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.05, 0.06, 0.02, 10),
+    getMaterial('MAT_CHARCOAL', { roughness: 0.5 }),
+  )
+  base.position.set(x, y, z)
+  parent.add(base)
+
+  const arm = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.012, 0.012, 0.28, 6),
+    getMaterial('MAT_STEEL', { roughness: 0.4, metalness: 0.4 }),
+  )
+  arm.position.set(x, y + 0.14, z)
+  arm.rotation.z = 0.35
+  parent.add(arm)
+
+  const shade = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.06, 0.08, 0.07, 10, 1, true),
+    getMaterial('MAT_BLUSH', { roughness: 0.7, side: THREE.DoubleSide }),
+  )
+  shade.position.set(x + 0.08, y + 0.26, z)
+  parent.add(shade)
+
+  const bulb = new THREE.PointLight(0xffcc99, 0.55, 2.5, 2)
+  bulb.position.set(x + 0.08, y + 0.24, z)
+  parent.add(bulb)
+  return bulb
+}
+
+function addFeminineAccents(parent: THREE.Object3D, y: number): void {
+  // Pastel notebook
+  const note = new THREE.Mesh(
+    new RoundedBoxGeometry(0.12, 0.015, 0.16, 1, 0.005),
+    getMaterial('MAT_LILAC', { roughness: 0.8 }),
+  )
+  note.position.set(0.35, y, 0.15)
+  parent.add(note)
+
+  // Tiny plush bunny silhouette
+  const bunny = new THREE.Mesh(
+    new THREE.SphereGeometry(0.035, 8, 6),
+    getMaterial('MAT_BLUSH', { roughness: 0.9 }),
+  )
+  bunny.position.set(-0.45, y + 0.03, 0.2)
+  parent.add(bunny)
+  const ear = new THREE.Mesh(
+    new THREE.CapsuleGeometry(0.012, 0.03, 2, 6),
+    getMaterial('MAT_BLUSH', { roughness: 0.9 }),
+  )
+  ear.position.set(-0.45, y + 0.07, 0.2)
+  parent.add(ear)
+
+  // Sticky note
+  const sticky = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.06, 0.06),
+    getMaterial('MAT_CORAL', { roughness: 0.85 }),
+  )
+  sticky.position.set(0.15, y + 0.001, 0.22)
+  sticky.rotation.x = -Math.PI / 2
+  parent.add(sticky)
+}
+
+/** Desk 1.4 × 0.7m with CRT + optional feminine accents */
 export function createDesk(
   parent: THREE.Object3D,
   colliders: ColliderWorld,
@@ -14,48 +113,69 @@ export function createDesk(
   z: number,
   rotationY = 0,
   withCollider = true,
+  withAccents = false,
 ): THREE.Group {
   const g = new THREE.Group()
   g.position.set(x, 0, z)
   g.rotation.y = rotationY
 
   const top = new THREE.Mesh(
-    new RoundedBoxGeometry(1.4, 0.05, 0.7, 2, 0.02),
-    getMaterial('MAT_DESK', { roughness: 0.65 }),
+    new RoundedBoxGeometry(1.4, 0.04, 0.7, 2, 0.015),
+    getMaterial('MAT_DESK', { roughness: 0.7 }),
   )
   top.position.y = 0.72
   top.castShadow = true
   top.receiveShadow = true
   g.add(top)
 
-  const legGeo = new RoundedBoxGeometry(0.06, 0.7, 0.06, 1, 0.01)
-  const legMat = getMaterial('MAT_LAVENDER_GREY', { roughness: 0.5 })
-  for (const [lx, lz] of [
-    [-0.6, -0.28],
-    [0.6, -0.28],
-    [-0.6, 0.28],
-    [0.6, 0.28],
-  ] as const) {
-    const leg = new THREE.Mesh(legGeo, legMat)
-    leg.position.set(lx, 0.35, lz)
-    leg.castShadow = true
-    g.add(leg)
+  // Pedestal drawer unit (one side)
+  const pedestal = new THREE.Mesh(
+    new RoundedBoxGeometry(0.4, 0.65, 0.62, 2, 0.015),
+    getMaterial('MAT_BEIGE_TECH', { roughness: 0.65 }),
+  )
+  pedestal.position.set(-0.45, 0.325, 0)
+  pedestal.castShadow = true
+  g.add(pedestal)
+  for (let i = 0; i < 3; i++) {
+    const handle = new THREE.Mesh(
+      new THREE.BoxGeometry(0.08, 0.015, 0.02),
+      getMaterial('MAT_STEEL', { roughness: 0.4, metalness: 0.35 }),
+    )
+    handle.position.set(-0.45, 0.18 + i * 0.18, 0.32)
+    g.add(handle)
   }
 
-  // Monitor
-  const monitor = new THREE.Mesh(
-    new RoundedBoxGeometry(0.45, 0.3, 0.04, 1, 0.01),
-    getMaterial('MAT_CHARCOAL', { roughness: 0.4 }),
+  const leg = new THREE.Mesh(
+    new RoundedBoxGeometry(0.05, 0.68, 0.05, 1, 0.008),
+    getMaterial('MAT_STEEL', { roughness: 0.45, metalness: 0.35 }),
   )
-  monitor.position.set(0, 0.95, -0.1)
-  g.add(monitor)
+  leg.position.set(0.6, 0.34, 0.28)
+  g.add(leg)
+  const leg2 = leg.clone()
+  leg2.position.set(0.6, 0.34, -0.28)
+  g.add(leg2)
 
-  const screen = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.4, 0.25),
-    getMaterial('MAT_DUSTY_BLUE', { roughness: 0.3, emissive: 0x4a6070, emissiveIntensity: 0.25 }),
+  addCrtMonitor(g, 0.05, 0.98, -0.12)
+
+  // Keyboard
+  const kb = new THREE.Mesh(
+    new RoundedBoxGeometry(0.4, 0.03, 0.14, 1, 0.008),
+    getMaterial('MAT_BEIGE_TECH', { roughness: 0.6 }),
   )
-  screen.position.set(0, 0.95, -0.078)
-  g.add(screen)
+  kb.position.set(0.05, 0.75, 0.18)
+  g.add(kb)
+
+  // Phone
+  const phone = new THREE.Mesh(
+    new RoundedBoxGeometry(0.14, 0.06, 0.18, 2, 0.01),
+    getMaterial('MAT_CHARCOAL', { roughness: 0.55 }),
+  )
+  phone.position.set(0.5, 0.76, -0.15)
+  g.add(phone)
+
+  addDeskLamp(g, -0.5, 0.74, -0.2)
+
+  if (withAccents) addFeminineAccents(g, 0.75)
 
   parent.add(g)
 
@@ -80,33 +200,45 @@ export function createChair(
   g.rotation.y = rotationY
 
   const seat = new THREE.Mesh(
-    new RoundedBoxGeometry(0.45, 0.06, 0.45, 2, 0.02),
-    getMaterial('MAT_CHAIR', { roughness: 0.7 }),
+    new RoundedBoxGeometry(0.48, 0.07, 0.48, 3, 0.03),
+    getMaterial('MAT_CHAIR', { roughness: 0.75 }),
   )
-  seat.position.y = 0.42
+  seat.position.y = 0.45
   seat.castShadow = true
   g.add(seat)
 
   const back = new THREE.Mesh(
-    new RoundedBoxGeometry(0.45, 0.4, 0.06, 2, 0.02),
-    getMaterial('MAT_CHAIR', { roughness: 0.7 }),
+    new RoundedBoxGeometry(0.46, 0.48, 0.07, 3, 0.03),
+    getMaterial('MAT_CHAIR', { roughness: 0.75 }),
   )
-  back.position.set(0, 0.65, -0.2)
+  back.position.set(0, 0.72, -0.22)
   g.add(back)
 
   const base = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.18, 0.2, 0.06, 12),
-    getMaterial('MAT_LAVENDER_GREY', { roughness: 0.5 }),
+    new THREE.CylinderGeometry(0.2, 0.22, 0.05, 12),
+    getMaterial('MAT_STEEL', { roughness: 0.4, metalness: 0.45 }),
   )
-  base.position.y = 0.05
+  base.position.y = 0.04
   g.add(base)
 
   const stem = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.03, 0.03, 0.35, 8),
-    getMaterial('MAT_LAVENDER_GREY', { roughness: 0.5 }),
+    new THREE.CylinderGeometry(0.028, 0.028, 0.38, 8),
+    getMaterial('MAT_STEEL', { roughness: 0.4, metalness: 0.45 }),
   )
   stem.position.y = 0.24
   g.add(stem)
+
+  // Five-star base feet
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * Math.PI * 2
+    const foot = new THREE.Mesh(
+      new THREE.BoxGeometry(0.22, 0.03, 0.04),
+      getMaterial('MAT_STEEL', { roughness: 0.4, metalness: 0.45 }),
+    )
+    foot.position.set(Math.cos(a) * 0.12, 0.03, Math.sin(a) * 0.12)
+    foot.rotation.y = -a
+    g.add(foot)
+  }
 
   parent.add(g)
   return g
@@ -124,12 +256,27 @@ export function createCabinet(
   g.rotation.y = rotationY
 
   const body = new THREE.Mesh(
-    new RoundedBoxGeometry(1.0, 1.4, 0.45, 2, 0.03),
-    getMaterial('MAT_LAVENDER_GREY', { roughness: 0.68 }),
+    new RoundedBoxGeometry(0.9, 1.5, 0.48, 2, 0.02),
+    getMaterial('MAT_STEEL', { roughness: 0.45, metalness: 0.35 }),
   )
-  body.position.y = 0.7
+  body.position.y = 0.75
   body.castShadow = true
   g.add(body)
+
+  for (let i = 0; i < 4; i++) {
+    const drawer = new THREE.Mesh(
+      new RoundedBoxGeometry(0.82, 0.32, 0.02, 1, 0.005),
+      getMaterial('MAT_STEEL', { roughness: 0.5, metalness: 0.3 }),
+    )
+    drawer.position.set(0, 0.28 + i * 0.36, 0.25)
+    g.add(drawer)
+    const handle = new THREE.Mesh(
+      new THREE.BoxGeometry(0.14, 0.02, 0.03),
+      getMaterial('MAT_CHARCOAL', { roughness: 0.4 }),
+    )
+    handle.position.set(0, 0.28 + i * 0.36, 0.28)
+    g.add(handle)
+  }
 
   parent.add(g)
   const cos = Math.abs(Math.cos(rotationY))
@@ -138,11 +285,11 @@ export function createCabinet(
     nid('cab'),
     'cabinet',
     x,
-    0.7,
+    0.75,
     z,
-    1.0 * cos + 0.45 * sin,
-    1.4,
-    1.0 * sin + 0.45 * cos,
+    0.9 * cos + 0.48 * sin,
+    1.5,
+    0.9 * sin + 0.48 * cos,
   )
   return g
 }
@@ -157,30 +304,41 @@ export function createPrinter(
   g.position.set(x, 0, z)
 
   const body = new THREE.Mesh(
-    new RoundedBoxGeometry(1.1, 1.0, 0.8, 3, 0.04),
-    getMaterial('MAT_DUSTY_BLUE', { roughness: 0.55 }),
+    new RoundedBoxGeometry(1.15, 0.85, 0.85, 3, 0.04),
+    getMaterial('MAT_BEIGE_TECH', { roughness: 0.55 }),
   )
-  body.position.y = 0.55
+  body.position.y = 0.5
   body.castShadow = true
   g.add(body)
 
-  const tray = new THREE.Mesh(
-    new RoundedBoxGeometry(0.7, 0.05, 0.35, 1, 0.01),
-    getMaterial('MAT_WARM_WHITE', { roughness: 0.6 }),
+  const lid = new THREE.Mesh(
+    new RoundedBoxGeometry(1.05, 0.08, 0.7, 2, 0.02),
+    getMaterial('MAT_BEIGE_TECH', { roughness: 0.5 }),
   )
-  tray.position.set(0, 0.35, 0.45)
+  lid.position.set(0, 0.98, -0.05)
+  g.add(lid)
+
+  const tray = new THREE.Mesh(
+    new RoundedBoxGeometry(0.75, 0.04, 0.4, 1, 0.01),
+    getMaterial('MAT_PAPER', { roughness: 0.7 }),
+  )
+  tray.position.set(0, 0.35, 0.5)
   g.add(tray)
 
-  const screen = new THREE.Mesh(
-    new RoundedBoxGeometry(0.35, 0.22, 0.04, 1, 0.01),
-    getMaterial('MAT_CHARCOAL', { roughness: 0.4, emissive: 0x3a5060, emissiveIntensity: 0.4 }),
+  const panel = new THREE.Mesh(
+    new RoundedBoxGeometry(0.4, 0.2, 0.05, 1, 0.01),
+    getMaterial('MAT_CHARCOAL', {
+      roughness: 0.4,
+      emissive: 0x2a4038,
+      emissiveIntensity: 0.35,
+    }),
   )
-  screen.position.set(0.25, 1.05, 0.3)
-  screen.rotation.x = -0.3
-  g.add(screen)
+  panel.position.set(0.3, 0.95, 0.35)
+  panel.rotation.x = -0.35
+  g.add(panel)
 
   parent.add(g)
-  colliders.addAabb(nid('printer'), 'printer', x, 0.55, z, 1.15, 1.1, 0.9)
+  colliders.addAabb(nid('printer'), 'printer', x, 0.55, z, 1.2, 1.1, 0.95)
   return g
 }
 
@@ -197,7 +355,7 @@ export function createTerminal(
 
   const desk = new THREE.Mesh(
     new RoundedBoxGeometry(1.0, 0.05, 0.55, 2, 0.02),
-    getMaterial('MAT_DESK', { roughness: 0.65 }),
+    getMaterial('MAT_DESK', { roughness: 0.7 }),
   )
   desk.position.y = 0.75
   desk.castShadow = true
@@ -206,18 +364,13 @@ export function createTerminal(
   for (const lx of [-0.4, 0.4]) {
     const leg = new THREE.Mesh(
       new RoundedBoxGeometry(0.05, 0.72, 0.05, 1, 0.01),
-      getMaterial('MAT_LAVENDER_GREY'),
+      getMaterial('MAT_STEEL', { roughness: 0.45, metalness: 0.3 }),
     )
     leg.position.set(lx, 0.36, 0)
     g.add(leg)
   }
 
-  const monitor = new THREE.Mesh(
-    new RoundedBoxGeometry(0.5, 0.35, 0.05, 1, 0.01),
-    getMaterial('MAT_CHARCOAL', { roughness: 0.35, emissive: 0x2a4050, emissiveIntensity: 0.5 }),
-  )
-  monitor.position.set(0, 1.05, -0.05)
-  g.add(monitor)
+  addCrtMonitor(g, 0, 1.05, -0.05)
 
   parent.add(g)
   colliders.addAabb(nid('term'), 'furniture', x, 0.4, z, 1.05, 0.85, 0.6)
@@ -488,22 +641,26 @@ export function createComplianceNotice(parent: THREE.Object3D, x: number, z: num
   g.rotation.y = rotationY
 
   const board = new THREE.Mesh(
-    new RoundedBoxGeometry(1.2, 0.9, 0.05, 2, 0.02),
-    getMaterial('MAT_WARM_WHITE', { roughness: 0.8 }),
+    new RoundedBoxGeometry(1.2, 0.9, 0.05, 2, 0.015),
+    new THREE.MeshStandardMaterial({
+      map: noticeBoardTexture(),
+      roughness: 0.85,
+      metalness: 0,
+    }),
   )
   board.position.y = 1.5
   g.add(board)
 
-  const accent = new THREE.Mesh(
-    new THREE.BoxGeometry(1.15, 0.08, 0.06),
-    getMaterial('MAT_CORAL', { roughness: 0.5 }),
+  const frame = new THREE.Mesh(
+    new THREE.BoxGeometry(1.28, 0.98, 0.03),
+    getMaterial('MAT_CHARCOAL', { roughness: 0.6 }),
   )
-  accent.position.set(0, 1.88, 0.01)
-  g.add(accent)
+  frame.position.set(0, 1.5, -0.02)
+  g.add(frame)
 
   const stand = new THREE.Mesh(
     new RoundedBoxGeometry(0.08, 1.1, 0.08, 1, 0.01),
-    getMaterial('MAT_LAVENDER_GREY'),
+    getMaterial('MAT_STEEL', { roughness: 0.45, metalness: 0.3 }),
   )
   stand.position.y = 0.55
   g.add(stand)

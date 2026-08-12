@@ -1,7 +1,8 @@
 import * as THREE from 'three'
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js'
-import { getMaterial, glassMaterial } from '../theme/materials'
+import { carpetMaterial, ceilingMaterial, getMaterial, glassMaterial, wallMaterial } from '../theme/materials'
 import type { PaletteKey } from '../theme/palette'
+import { sloganTexture } from '../theme/textures'
 import type { ColliderWorld } from './colliders'
 import type { DoorRecord } from './doors'
 
@@ -15,18 +16,18 @@ export function createFloor(
   z: number,
   w: number,
   d: number,
-  matKey: PaletteKey = 'MAT_FLOOR',
+  _matKey: PaletteKey = 'MAT_FLOOR',
 ): THREE.Mesh {
   const mesh = new THREE.Mesh(
     new THREE.PlaneGeometry(w, d),
-    getMaterial(matKey, { roughness: 0.85 }),
+    carpetMaterial(Math.max(2, w / 2), Math.max(2, d / 2)),
   )
   mesh.rotation.x = -Math.PI / 2
   mesh.position.set(x, 0.001, z)
   mesh.receiveShadow = true
   parent.add(mesh)
-  // Floor doesn't need player collision (y=0 plane)
   void colliders
+  void _matKey
   return mesh
 }
 
@@ -40,7 +41,7 @@ export function createCeiling(
 ): THREE.Mesh {
   const mesh = new THREE.Mesh(
     new THREE.PlaneGeometry(w, d),
-    getMaterial('MAT_CEILING', { roughness: 0.9, side: THREE.DoubleSide }),
+    ceilingMaterial(Math.max(2, w / 1.5), Math.max(2, d / 1.5)),
   )
   mesh.rotation.x = Math.PI / 2
   mesh.position.set(x, y, z)
@@ -61,16 +62,29 @@ export function createWall(
   matKey: PaletteKey = 'MAT_WALL',
   withCollider = true,
 ): THREE.Mesh {
-  const geo = new RoundedBoxGeometry(length, height, thickness, 2, 0.02)
-  const mesh = new THREE.Mesh(geo, getMaterial(matKey, { roughness: 0.78 }))
+  const usePaint = matKey === 'MAT_WALL'
+  const mat = usePaint
+    ? wallMaterial(Math.max(1, length / 2), height / 3)
+    : getMaterial(matKey, { roughness: 0.82 })
+
+  const geo = new RoundedBoxGeometry(length, height, thickness, 2, 0.015)
+  const mesh = new THREE.Mesh(geo, mat)
   mesh.position.set(cx, height / 2, cz)
   mesh.rotation.y = rotationY
   mesh.castShadow = true
   mesh.receiveShadow = true
   parent.add(mesh)
 
+  // Baseboard
+  const base = new THREE.Mesh(
+    new THREE.BoxGeometry(length, 0.08, thickness + 0.02),
+    getMaterial('MAT_BASEBOARD', { roughness: 0.7 }),
+  )
+  base.position.set(cx, 0.04, cz)
+  base.rotation.y = rotationY
+  parent.add(base)
+
   if (withCollider) {
-    // Approximate world AABB for axis-aligned walls; for rotated, expand
     const cos = Math.abs(Math.cos(rotationY))
     const sin = Math.abs(Math.sin(rotationY))
     const sx = length * cos + thickness * sin
@@ -217,8 +231,8 @@ export function createDoorVisual(parent: THREE.Object3D, record: DoorRecord): Do
   const panel = new THREE.Mesh(
     new RoundedBoxGeometry(record.width - 0.04, record.height - 0.06, 0.06, 2, 0.02),
     getMaterial(
-      record.state === 'locked' ? 'MAT_CHARCOAL' : 'MAT_WARM_WHITE',
-      { roughness: 0.6 },
+      record.state === 'locked' ? 'MAT_CHARCOAL' : 'MAT_BEIGE_TECH',
+      { roughness: 0.62 },
     ),
   )
   panel.position.set(0, record.height / 2, 0)
@@ -275,7 +289,7 @@ export function createColumn(
 ): THREE.Mesh {
   const mesh = new THREE.Mesh(
     new RoundedBoxGeometry(0.35, height, 0.35, 2, 0.04),
-    getMaterial('MAT_LAVENDER_GREY', { roughness: 0.7 }),
+    getMaterial('MAT_CONCRETE', { roughness: 0.85 }),
   )
   mesh.position.set(x, height / 2, z)
   mesh.castShadow = true
@@ -284,24 +298,127 @@ export function createColumn(
   return mesh
 }
 
+/** Recessed fluorescent ceiling panel — Quiet Dread key light */
 export function createCeilingLight(
   parent: THREE.Object3D,
   x: number,
   y: number,
   z: number,
-  color = 0xfff5ea,
-  intensity = 1.2,
-): THREE.PointLight {
-  const fixture = new THREE.Mesh(
-    new RoundedBoxGeometry(1.2, 0.06, 0.4, 1, 0.01),
-    getMaterial('MAT_WARM_WHITE', { roughness: 0.4, emissive: color, emissiveIntensity: 0.35 }),
+  color = 0xe8eef2,
+  intensity = 1.4,
+): THREE.RectAreaLight {
+  const housing = new THREE.Mesh(
+    new RoundedBoxGeometry(1.35, 0.05, 1.35, 1, 0.01),
+    getMaterial('MAT_STEEL', { roughness: 0.55, metalness: 0.25 }),
   )
-  fixture.position.set(x, y - 0.05, z)
-  parent.add(fixture)
+  housing.position.set(x, y - 0.02, z)
+  parent.add(housing)
 
-  const light = new THREE.PointLight(color, intensity, 14, 2)
-  light.position.set(x, y - 0.2, z)
-  light.castShadow = false
+  const diffuser = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.2, 1.2),
+    getMaterial('MAT_WARM_WHITE', {
+      roughness: 0.35,
+      emissive: color,
+      emissiveIntensity: 0.85,
+      side: THREE.DoubleSide,
+    }),
+  )
+  diffuser.rotation.x = Math.PI / 2
+  diffuser.position.set(x, y - 0.048, z)
+  parent.add(diffuser)
+
+  // Cross grille
+  const grilleMat = getMaterial('MAT_STEEL', { roughness: 0.5, metalness: 0.3 })
+  for (const offset of [-0.3, 0, 0.3]) {
+    const hx = new THREE.Mesh(new THREE.BoxGeometry(1.15, 0.01, 0.02), grilleMat)
+    hx.position.set(x, y - 0.055, z + offset)
+    parent.add(hx)
+    const hz = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.01, 1.15), grilleMat)
+    hz.position.set(x + offset, y - 0.055, z)
+    parent.add(hz)
+  }
+
+  const light = new THREE.RectAreaLight(color, intensity, 1.15, 1.15)
+  light.position.set(x, y - 0.08, z)
+  light.lookAt(x, 0, z)
   parent.add(light)
   return light
+}
+
+/** Large bold slogan painted on a wall plane */
+export function createWallSlogan(
+  parent: THREE.Object3D,
+  lines: string[],
+  x: number,
+  y: number,
+  z: number,
+  rotationY: number,
+  width = 3.2,
+  height = 0.9,
+): THREE.Mesh {
+  const tex = sloganTexture(lines, { width: 1024, height: 384 })
+  const mat = new THREE.MeshStandardMaterial({
+    map: tex,
+    transparent: true,
+    roughness: 0.95,
+    metalness: 0,
+    depthWrite: false,
+  })
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, height), mat)
+  mesh.position.set(x, y, z)
+  mesh.rotation.y = rotationY
+  parent.add(mesh)
+  return mesh
+}
+
+/** Cubicle-style low partition */
+export function createCubiclePartition(
+  parent: THREE.Object3D,
+  colliders: ColliderWorld,
+  x: number,
+  z: number,
+  length: number,
+  rotationY: number,
+  height = 1.15,
+): THREE.Group {
+  const g = new THREE.Group()
+  g.position.set(x, 0, z)
+  g.rotation.y = rotationY
+
+  const panel = new THREE.Mesh(
+    new RoundedBoxGeometry(length, height, 0.06, 2, 0.02),
+    getMaterial('MAT_STEEL', { roughness: 0.75 }),
+  )
+  panel.position.y = height / 2
+  panel.castShadow = true
+  g.add(panel)
+
+  const fabric = new THREE.Mesh(
+    new RoundedBoxGeometry(length - 0.08, height - 0.2, 0.04, 1, 0.01),
+    getMaterial('MAT_LAVENDER_GREY', { roughness: 0.92 }),
+  )
+  fabric.position.y = height / 2
+  g.add(fabric)
+
+  const trim = new THREE.Mesh(
+    new THREE.BoxGeometry(length, 0.04, 0.08),
+    getMaterial('MAT_CHARCOAL', { roughness: 0.5 }),
+  )
+  trim.position.y = height
+  g.add(trim)
+
+  parent.add(g)
+  const cos = Math.abs(Math.cos(rotationY))
+  const sin = Math.abs(Math.sin(rotationY))
+  colliders.addAabb(
+    nextId('part'),
+    'furniture',
+    x,
+    height / 2,
+    z,
+    length * cos + 0.1 * sin,
+    height,
+    length * sin + 0.1 * cos,
+  )
+  return g
 }

@@ -83,8 +83,8 @@ export function buildManagerOffice(
   createPlant(props, 3.0, z0 + 1.2, true)
 
   // Darker / fewer lights
-  createCeilingLight(architecture, 0, h, cz, 0xe8dcc8, 0.55)
-  createCeilingLight(architecture, 0, h, z0 + 1.5, 0xc4a574, 0.7)
+  createCeilingLight(architecture, 0, h, cz, 0xd0d4d8, 0.4)
+  createCeilingLight(architecture, 0, h, z0 + 1.5, 0xe0d4b8, 0.55)
 
   doors.register({
     id: 'door_manager',
