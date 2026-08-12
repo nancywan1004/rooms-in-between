@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rooms Between — Office MVP</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body,
+      #app {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #1a1816;
+        font-family: 'Segoe UI', system-ui, sans-serif;
+      }
+      canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+      #hud {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        color: #f5f0e8;
+        z-index: 10;
+      }
+      #crosshair {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 8px;
+        height: 8px;
+        margin: -4px 0 0 -4px;
+        border: 1.5px solid rgba(245, 240, 232, 0.55);
+        border-radius: 50%;
+        opacity: 0;
+        transition: opacity 0.2s;
+      }
+      #crosshair.visible {
+        opacity: 1;
+      }
+      #prompt {
+        position: absolute;
+        left: 50%;
+        bottom: 18%;
+        transform: translateX(-50%);
+        padding: 0.55rem 1rem;
+        background: rgba(26, 24, 22, 0.72);
+        border-radius: 6px;
+        font-size: 0.9rem;
+        letter-spacing: 0.02em;
+        opacity: 0;
+        transition: opacity 0.15s;
+        max-width: 90vw;
+        text-align: center;
+      }
+      #prompt.visible {
+        opacity: 1;
+      }
+      #overlay {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(26, 24, 22, 0.55);
+        pointer-events: auto;
+        cursor: pointer;
+      }
+      #overlay.hidden {
+        display: none;
+      }
+      #overlay .card {
+        text-align: center;
+        padding: 2rem 2.5rem;
+        background: rgba(245, 240, 232, 0.92);
+        color: #2a2622;
+        border-radius: 12px;
+        max-width: 22rem;
+      }
+      #overlay h1 {
+        font-size: 1.35rem;
+        font-weight: 600;
+        margin-bottom: 0.6rem;
+      }
+      #overlay p {
+        font-size: 0.9rem;
+        line-height: 1.5;
+        opacity: 0.85;
+      }
+      #debug {
+        position: absolute;
+        left: 12px;
+        top: 12px;
+        font-size: 12px;
+        line-height: 1.45;
+        opacity: 0.7;
+        white-space: pre;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <div id="hud">
+      <div id="debug"></div>
+      <div id="crosshair"></div>
+      <div id="prompt"></div>
+      <div id="overlay">
+        <div class="card">
+          <h1>Rooms Between</h1>
+          <p>点击进入办公室<br />WASD 移动 · 鼠标环视 · E 交互门 · Shift 奔跑</p>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
