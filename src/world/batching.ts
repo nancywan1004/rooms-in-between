@@ -273,6 +273,10 @@ export function getWallBatcher(): MeshBatcher | null {
   return wallBatcher
 }
 
+export function isWorldBatching(): boolean {
+  return wallBatcher !== null
+}
+
 export function queueChair(x: number, z: number, rotationY: number): void {
   chairPoses.push({ x, y: 0, z, rotationY })
 }

@@ -3,7 +3,7 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { getMaterial, deskMaterial, plasticMaterial, metalMaterial, crtScreenMaterial } from '../theme/materials'
 import { noticeBoardTexture } from '../theme/textures'
 import type { ColliderWorld } from './colliders'
-import { queueChair } from './batching'
+import { buildChairGeometry, isWorldBatching, queueChair } from './batching'
 
 let seq = 0
 const nid = (p: string) => `${p}_${++seq}`
@@ -267,10 +267,19 @@ export function createChair(
   x: number,
   z: number,
   rotationY = 0,
-): null {
-  void parent
-  queueChair(x, z, rotationY)
-  return null
+): THREE.Group | null {
+  if (isWorldBatching()) {
+    queueChair(x, z, rotationY)
+    return null
+  }
+  const g = new THREE.Group()
+  g.position.set(x, 0, z)
+  g.rotation.y = rotationY
+  const mesh = new THREE.Mesh(buildChairGeometry(), getMaterial('MAT_CHAIR', { roughness: 0.75 }))
+  mesh.castShadow = true
+  g.add(mesh)
+  parent.add(g)
+  return g
 }
 
 export function createCabinet(

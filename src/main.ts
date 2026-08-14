@@ -1,11 +1,19 @@
 import { Game } from './core/Game'
+import { EditorApp } from './editor/EditorApp'
+import { setOfficeState } from './systems/OfficeState'
 
 const app = document.querySelector<HTMLDivElement>('#app')
 if (!app) throw new Error('#app missing')
 
-const game = new Game(app)
-game.start()
+const legacy = new URLSearchParams(location.search).has('legacy')
 
-// Expose for console debugging / Agent Spec API
-import { setOfficeState } from './systems/OfficeState'
+if (legacy) {
+  const game = new Game(app)
+  game.start()
+} else {
+  document.getElementById('hud')?.remove()
+  const editor = new EditorApp(app)
+  editor.start()
+}
+
 ;(window as unknown as { setOfficeState: typeof setOfficeState }).setOfficeState = setOfficeState

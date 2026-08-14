@@ -5,7 +5,7 @@ import type { PaletteKey } from '../theme/palette'
 import { sloganTexture } from '../theme/textures'
 import type { ColliderWorld } from './colliders'
 import type { DoorRecord } from './doors'
-import { getWallBatcher, queueCeilingPanel } from './batching'
+import { getWallBatcher, isWorldBatching, queueCeilingPanel } from './batching'
 
 let idSeq = 0
 const nextId = (prefix: string) => `${prefix}_${++idSeq}`
@@ -354,10 +354,32 @@ export function createCeilingLight(
   _intensity = 2.2,
 ): THREE.Object3D | null {
   void _intensity
-  void color
-  void parent
-  queueCeilingPanel(x, y, z)
-  return null
+  if (isWorldBatching()) {
+    queueCeilingPanel(x, y, z)
+    return null
+  }
+  const g = new THREE.Group()
+  g.position.set(x, y, z)
+  const housing = new THREE.Mesh(
+    new THREE.BoxGeometry(1.4, 0.06, 1.4),
+    getMaterial('MAT_STEEL', { roughness: 0.45, metalness: 0.35 }),
+  )
+  housing.position.y = -0.015
+  g.add(housing)
+  const diffuser = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.22, 1.22),
+    getMaterial('MAT_WARM_WHITE', {
+      roughness: 0.25,
+      emissive: color,
+      emissiveIntensity: 1.05,
+      side: THREE.DoubleSide,
+    }),
+  )
+  diffuser.rotation.x = Math.PI / 2
+  diffuser.position.y = -0.05
+  g.add(diffuser)
+  parent.add(g)
+  return g
 }
 
 /** Sparse realtime fill lights for the office (call a few times only) */

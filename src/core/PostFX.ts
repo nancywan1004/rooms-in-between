@@ -51,6 +51,7 @@ const QuietDreadShader = {
 export class PostFX {
   private readonly composer: EffectComposer
   private readonly grade: ShaderPass
+  private readonly renderPass: RenderPass
 
   constructor(
     renderer: THREE.WebGLRenderer,
@@ -58,10 +59,15 @@ export class PostFX {
     camera: THREE.Camera,
   ) {
     this.composer = new EffectComposer(renderer)
-    this.composer.addPass(new RenderPass(scene, camera))
+    this.renderPass = new RenderPass(scene, camera)
+    this.composer.addPass(this.renderPass)
     this.grade = new ShaderPass(QuietDreadShader)
     this.composer.addPass(this.grade)
     this.composer.addPass(new OutputPass())
+  }
+
+  setCamera(camera: THREE.Camera): void {
+    this.renderPass.camera = camera
   }
 
   setSize(w: number, h: number): void {
