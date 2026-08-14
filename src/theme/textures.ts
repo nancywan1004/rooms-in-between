@@ -6,30 +6,43 @@ function cache(key: string, make: () => THREE.Texture): THREE.Texture {
   const hit = texCache.get(key)
   if (hit) return hit
   const t = make()
-  t.colorSpace = THREE.SRGBColorSpace
+  // Allow makers to opt into NoColorSpace (roughness/data maps)
+  if ((t as THREE.Texture & { __dataMap?: boolean }).__dataMap) {
+    t.colorSpace = THREE.NoColorSpace
+  } else {
+    t.colorSpace = THREE.SRGBColorSpace
+  }
   texCache.set(key, t)
   return t
 }
 
-/** Industrial office carpet — muted mottled gray-brown */
+/** Industrial office carpet — denser mottled gray-brown with wear */
 export function carpetTexture(): THREE.Texture {
-  return cache('carpet', () => {
-    const size = 256
+  return cache('carpet_v2', () => {
+    const size = 512
     const c = document.createElement('canvas')
     c.width = c.height = size
     const ctx = c.getContext('2d')!
-    ctx.fillStyle = '#7a746c'
+    ctx.fillStyle = '#6a645c'
     ctx.fillRect(0, 0, size, size)
-    for (let i = 0; i < 9000; i++) {
-      const g = 90 + ((i * 17) % 50)
-      const r = g + ((i * 3) % 12)
-      const b = g - ((i * 5) % 10)
-      ctx.fillStyle = `rgba(${r},${g},${b},${0.08 + (i % 5) * 0.02})`
-      ctx.fillRect((i * 37) % size, (i * 53) % size, 1 + (i % 2), 1 + (i % 3))
+    for (let i = 0; i < 28000; i++) {
+      const g = 70 + ((i * 17) % 55)
+      const r = g + ((i * 3) % 14) - 4
+      const b = g - ((i * 5) % 12)
+      ctx.fillStyle = `rgba(${r},${g},${b},${0.1 + (i % 6) * 0.025})`
+      ctx.fillRect((i * 37) % size, (i * 53) % size, 1 + (i % 3), 1 + (i % 4))
     }
-    // Soft weave lines
-    ctx.strokeStyle = 'rgba(60,55,50,0.06)'
-    for (let y = 0; y < size; y += 4) {
+    // Traffic wear streaks
+    for (let i = 0; i < 40; i++) {
+      ctx.strokeStyle = `rgba(90,85,78,${0.08 + (i % 5) * 0.02})`
+      ctx.lineWidth = 2 + (i % 3)
+      ctx.beginPath()
+      ctx.moveTo((i * 47) % size, 0)
+      ctx.lineTo(((i * 47) + 80) % size, size)
+      ctx.stroke()
+    }
+    ctx.strokeStyle = 'rgba(45,42,38,0.08)'
+    for (let y = 0; y < size; y += 3) {
       ctx.beginPath()
       ctx.moveTo(0, y)
       ctx.lineTo(size, y)
@@ -38,6 +51,118 @@ export function carpetTexture(): THREE.Texture {
     const tex = new THREE.CanvasTexture(c)
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping
     tex.anisotropy = 8
+    return tex
+  })
+}
+
+/** Desk laminate — warm gray with fine grain + faint edge wear */
+export function deskLaminateTexture(): THREE.Texture {
+  return cache('desk_lam', () => {
+    const size = 512
+    const c = document.createElement('canvas')
+    c.width = c.height = size
+    const ctx = c.getContext('2d')!
+    const grad = ctx.createLinearGradient(0, 0, size, size)
+    grad.addColorStop(0, '#b8ae9c')
+    grad.addColorStop(0.5, '#c4baa8')
+    grad.addColorStop(1, '#aea492')
+    ctx.fillStyle = grad
+    ctx.fillRect(0, 0, size, size)
+    for (let i = 0; i < 12000; i++) {
+      const v = 160 + (i % 40)
+      ctx.fillStyle = `rgba(${v},${v - 8},${v - 20},0.06)`
+      ctx.fillRect((i * 19) % size, (i * 31) % size, 2 + (i % 4), 1)
+    }
+    // Coffee ring stains (subtle)
+    for (const [cx, cy] of [
+      [120, 200],
+      [380, 340],
+      [260, 90],
+    ]) {
+      ctx.strokeStyle = 'rgba(90,70,50,0.12)'
+      ctx.lineWidth = 3
+      ctx.beginPath()
+      ctx.arc(cx, cy, 18 + (cx % 10), 0, Math.PI * 2)
+      ctx.stroke()
+    }
+    const tex = new THREE.CanvasTexture(c)
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping
+    tex.anisotropy = 4
+    return tex
+  })
+}
+
+/** Beige office plastic — micro noise for CRT / printer housings */
+export function beigePlasticTexture(): THREE.Texture {
+  return cache('plastic', () => {
+    const size = 256
+    const c = document.createElement('canvas')
+    c.width = c.height = size
+    const ctx = c.getContext('2d')!
+    ctx.fillStyle = '#c8c0b0'
+    ctx.fillRect(0, 0, size, size)
+    for (let i = 0; i < 8000; i++) {
+      const v = 180 + (i % 35)
+      ctx.fillStyle = `rgba(${v},${v - 4},${v - 14},0.12)`
+      ctx.fillRect((i * 23) % size, (i * 41) % size, 1, 1)
+    }
+    // Soft molded highlight band
+    const g = ctx.createLinearGradient(0, 0, 0, size)
+    g.addColorStop(0, 'rgba(255,255,250,0.12)')
+    g.addColorStop(0.4, 'rgba(0,0,0,0)')
+    g.addColorStop(1, 'rgba(40,35,30,0.1)')
+    ctx.fillStyle = g
+    ctx.fillRect(0, 0, size, size)
+    const tex = new THREE.CanvasTexture(c)
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping
+    return tex
+  })
+}
+
+/** Brushed metal for cabinets / frames */
+export function brushedMetalTexture(): THREE.Texture {
+  return cache('metal', () => {
+    const size = 256
+    const c = document.createElement('canvas')
+    c.width = c.height = size
+    const ctx = c.getContext('2d')!
+    ctx.fillStyle = '#6a7684'
+    ctx.fillRect(0, 0, size, size)
+    for (let y = 0; y < size; y++) {
+      const v = 90 + ((y * 17) % 40)
+      ctx.fillStyle = `rgba(${v},${v + 4},${v + 10},${0.15 + (y % 3) * 0.05})`
+      ctx.fillRect(0, y, size, 1)
+    }
+    for (let i = 0; i < 30; i++) {
+      ctx.strokeStyle = `rgba(200,210,220,${0.04 + (i % 4) * 0.02})`
+      ctx.beginPath()
+      ctx.moveTo(0, (i * 37) % size)
+      ctx.lineTo(size, ((i * 37) + 8) % size)
+      ctx.stroke()
+    }
+    const tex = new THREE.CanvasTexture(c)
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping
+    return tex
+  })
+}
+
+/** Roughness companion for laminate (scuffs) */
+export function deskRoughnessTexture(): THREE.Texture {
+  return cache('desk_rough', () => {
+    const size = 256
+    const c = document.createElement('canvas')
+    c.width = c.height = size
+    const ctx = c.getContext('2d')!
+    ctx.fillStyle = '#b0b0b0'
+    ctx.fillRect(0, 0, size, size)
+    for (let i = 0; i < 4000; i++) {
+      const v = 100 + (i % 80)
+      ctx.fillStyle = `rgb(${v},${v},${v})`
+      ctx.fillRect((i * 29) % size, (i * 47) % size, 2, 2)
+    }
+    const tex = new THREE.CanvasTexture(c)
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping
+    ;(tex as THREE.Texture & { __dataMap?: boolean }).__dataMap = true
     return tex
   })
 }
@@ -177,3 +302,50 @@ export function noticeBoardTexture(): THREE.Texture {
     return new THREE.CanvasTexture(c)
   })
 }
+
+/** Vending machine "REFRESH" label */
+export function vendingLabelTexture(): THREE.Texture {
+  return cache('vending', () => {
+    const w = 512
+    const h = 128
+    const c = document.createElement('canvas')
+    c.width = w
+    c.height = h
+    const ctx = c.getContext('2d')!
+    ctx.fillStyle = '#2c2a2a'
+    ctx.fillRect(0, 0, w, h)
+    ctx.fillStyle = '#c4887a'
+    ctx.fillRect(0, 0, w, 8)
+    ctx.fillRect(0, h - 8, w, 8)
+    ctx.fillStyle = '#efeae2'
+    ctx.font = 'bold 56px "Arial Narrow", Arial, sans-serif'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText('REFRESH', w / 2, h / 2)
+    return new THREE.CanvasTexture(c)
+  })
+}
+
+/** Abstract corporate wall art — muted geometric */
+export function wallFrameTexture(): THREE.Texture {
+  return cache('frame', () => {
+    const size = 256
+    const c = document.createElement('canvas')
+    c.width = c.height = size
+    const ctx = c.getContext('2d')!
+    ctx.fillStyle = '#c8c0b4'
+    ctx.fillRect(0, 0, size, size)
+    ctx.fillStyle = '#8a9a86'
+    ctx.fillRect(24, 40, 100, 160)
+    ctx.fillStyle = '#6d7f92'
+    ctx.fillRect(140, 60, 80, 120)
+    ctx.fillStyle = '#b0a4b8'
+    ctx.beginPath()
+    ctx.arc(180, 180, 36, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.fillStyle = 'rgba(44,42,42,0.15)'
+    ctx.fillRect(0, 0, size, size)
+    return new THREE.CanvasTexture(c)
+  })
+}
+

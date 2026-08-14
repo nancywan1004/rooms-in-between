@@ -10,11 +10,19 @@ import {
 } from '../architecture'
 import {
   createCabinet,
-  createChair,
   createComplianceNotice,
-  createDesk,
   createPlant,
 } from '../furniture'
+import {
+  createFloorPlanter,
+  createHighWindow,
+  createLavenderVase,
+  createPersonalizedMug,
+  createTrashBin,
+  createWallClock,
+  createWallFrame,
+} from '../dressing'
+import { queueChair, queueDesk } from '../batching'
 import { ROOM, officeLayout } from '../layout'
 import type { ColliderWorld } from '../colliders'
 import type { DoorRegistry } from '../doors'
@@ -84,14 +92,29 @@ export function buildOpenOffice(
   createCubiclePartition(props, colliders, -4.2, 2.5, 2.6, 0, 1.2)
   createCubiclePartition(props, colliders, 4.2, 2.8, 2.2, 0, 1.2)
 
-  // Desk islands — a few with feminine accents (tragic personalization)
+  // Desk islands — instanced body + chairs; sparse feminine accents
   officeLayout.desks.forEach((desk, i) => {
-    const accents = i === 2 || i === 7 || i === 11
-    createDesk(props, colliders, desk.x, desk.z, desk.rotation, true, accents)
+    queueDesk(desk.x, desk.z, desk.rotation)
+    const cos = Math.abs(Math.cos(desk.rotation))
+    const sin = Math.abs(Math.sin(desk.rotation))
+    colliders.addAabb(
+      `desk_oo_${i}`,
+      'desk',
+      desk.x,
+      0.4,
+      desk.z,
+      1.4 * cos + 0.7 * sin,
+      0.8,
+      1.4 * sin + 0.7 * cos,
+    )
     const chairOffset = 0.65
     const ox = Math.sin(desk.rotation) * chairOffset
     const oz = Math.cos(desk.rotation) * chairOffset
-    createChair(props, desk.x + ox, desk.z + oz, desk.rotation + Math.PI)
+    queueChair(desk.x + ox, desk.z + oz, desk.rotation + Math.PI)
+
+    if (i === 2 || i === 7 || i === 11) {
+      createLavenderVase(props, desk.x, 0.75, desk.z)
+    }
   })
 
   createCabinet(props, colliders, -6.2, -4.8, Math.PI / 2)
@@ -100,8 +123,21 @@ export function buildOpenOffice(
 
   createPlant(props, -1.5, -0.8, true)
   createPlant(props, 1.8, 0.6, false)
+  createFloorPlanter(props, 5.8, 4.8)
+  createFloorPlanter(props, -5.5, -0.5)
 
   createComplianceNotice(props, -5.2, 4.5, Math.PI)
+
+  // Dressing — frames, clock, high windows, trash
+  createWallFrame(architecture, 3.5, 2.0, z0 + 0.12, 0, 0.8, 0.55)
+  createWallFrame(architecture, -4.5, 1.9, z0 + 0.12, 0, 0.6, 0.45)
+  createWallClock(architecture, 0, 2.6, z1 - 0.12, Math.PI)
+  createHighWindow(architecture, 5.5, 2.7, z1 - 0.12, Math.PI, 1.8, 0.5)
+  createHighWindow(architecture, -5.8, 2.7, z0 + 0.12, 0, 1.5, 0.5)
+  createTrashBin(props, -2.8, 4.2)
+  createTrashBin(props, 2.5, -4.5)
+  createLavenderVase(props, -1.2, 0.02, 0.4)
+  createPersonalizedMug(props, 0.8, 0.02, -0.3, 'MAT_CORAL')
 
   // Fluorescent grid
   for (const [lx, lz] of [
@@ -114,7 +150,7 @@ export function buildOpenOffice(
     [-4, 3.5],
     [4, 3.5],
   ] as const) {
-    createCeilingLight(architecture, lx, h, lz, 0xe8eef2, 1.35)
+    createCeilingLight(architecture, lx, h, lz, 0xe8eef2, 2.4)
   }
 
   // Subtle room-entry tint

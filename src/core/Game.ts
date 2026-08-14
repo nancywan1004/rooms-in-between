@@ -10,7 +10,7 @@ import {
   OfficeStateController,
   bindOfficeStateApi,
 } from '../systems/OfficeState'
-import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js'
+import { PostFX } from './PostFX'
 
 export class Game {
   private readonly renderer: THREE.WebGLRenderer
@@ -22,6 +22,7 @@ export class Game {
   private readonly triggers = new TriggerRegistry()
   private readonly officeState = new OfficeStateController()
   private world!: OfficeWorld
+  private postFX!: PostFX
 
   private readonly hemi: THREE.HemisphereLight
   private readonly sun: THREE.DirectionalLight
@@ -36,14 +37,12 @@ export class Game {
   private running = false
 
   constructor(container: HTMLElement) {
-    RectAreaLightUniformsLib.init()
-
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' })
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5))
     this.renderer.setSize(window.innerWidth, window.innerHeight)
     this.renderer.outputColorSpace = THREE.SRGBColorSpace
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
-    this.renderer.toneMappingExposure = 0.92
+    this.renderer.toneMappingExposure = 1.15
     this.renderer.shadowMap.enabled = true
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
     container.appendChild(this.renderer.domElement)
@@ -51,32 +50,30 @@ export class Game {
     this.player = new PlayerController(window.innerWidth / window.innerHeight)
     this.player.setSpawn(officeLayout.spawn.x, officeLayout.spawn.z, officeLayout.spawn.yaw)
 
-    this.hemi = new THREE.HemisphereLight(0xd8dde2, 0x6a6864, 0.32)
+    this.hemi = new THREE.HemisphereLight(0xe8eef4, 0x5a5854, 0.55)
     this.scene.add(this.hemi)
 
-    this.sun = new THREE.DirectionalLight(0xe4eaf0, 0.35)
-    this.sun.position.set(4, 16, 2)
+    this.sun = new THREE.DirectionalLight(0xf0f4f8, 0.65)
+    this.sun.position.set(3, 14, 1)
     this.sun.castShadow = true
-    this.sun.shadow.mapSize.set(2048, 2048)
+    this.sun.shadow.mapSize.set(1024, 1024)
     this.sun.shadow.camera.near = 1
-    this.sun.shadow.camera.far = 60
-    this.sun.shadow.camera.left = -20
-    this.sun.shadow.camera.right = 20
-    this.sun.shadow.camera.top = 20
-    this.sun.shadow.camera.bottom = -20
-    this.sun.shadow.bias = -0.0002
+    this.sun.shadow.camera.far = 50
+    this.sun.shadow.camera.left = -18
+    this.sun.shadow.camera.right = 18
+    this.sun.shadow.camera.top = 18
+    this.sun.shadow.camera.bottom = -18
+    this.sun.shadow.bias = -0.0003
     this.scene.add(this.sun)
-
-    // Cool overhead fill — fluorescent wash
-    const rect = new THREE.RectAreaLight(0xe8eef2, 1.8, 12, 10)
-    rect.position.set(0, 3.25, 0)
-    rect.lookAt(0, 0, 0)
-    this.scene.add(rect)
 
     this.officeState.bind(this.scene, this.hemi, this.sun)
     bindOfficeStateApi(this.officeState)
 
     this.world = buildOffice(this.scene, this.colliders, this.doors, this.triggers)
+
+    this.postFX = new PostFX(this.renderer, this.scene, this.player.camera)
+    this.postFX.setMood('ORDER')
+    this.officeState.onMood((s) => this.postFX.setMood(s))
 
     this.overlay = document.getElementById('overlay')!
     this.promptEl = document.getElementById('prompt')!
@@ -98,7 +95,6 @@ export class Game {
       this.crosshair.classList.toggle('visible', locked)
     })
 
-    // Dev helper: unlock doors with keys 1-4
     window.addEventListener('keydown', (e) => {
       if (e.code === 'Digit1') this.doors.setState('door_printer', 'closed')
       if (e.code === 'Digit2') this.doors.setState('door_break', 'closed')
@@ -137,6 +133,7 @@ export class Game {
     this.player.camera.aspect = w / h
     this.player.camera.updateProjectionMatrix()
     this.renderer.setSize(w, h)
+    this.postFX.setSize(w, h)
   }
 
   private frame = (now: number): void => {
@@ -149,6 +146,7 @@ export class Game {
     }
 
     this.world.manager.update(dt)
+    this.world.crtFlicker.update(dt)
 
     const entered = this.triggers.update(
       this.player.position.x,
@@ -186,7 +184,7 @@ export class Game {
       `state ${this.officeState.current}\n` +
       `doors M:${this.doors.get('door_manager')?.state} Mt:${this.doors.get('door_meeting')?.state}`
 
-    this.renderer.render(this.scene, this.player.camera)
+    this.postFX.render()
     requestAnimationFrame(this.frame)
   }
 

@@ -5,6 +5,7 @@ import type { PaletteKey } from '../theme/palette'
 import { sloganTexture } from '../theme/textures'
 import type { ColliderWorld } from './colliders'
 import type { DoorRecord } from './doors'
+import { getWallBatcher, queueCeilingPanel } from './batching'
 
 let idSeq = 0
 const nextId = (prefix: string) => `${prefix}_${++idSeq}`
@@ -49,7 +50,7 @@ export function createCeiling(
   return mesh
 }
 
-/** Wall segment as box; center at floor contact mid-height. */
+/** Wall segment — batched when world batch session is active */
 export function createWall(
   parent: THREE.Object3D,
   colliders: ColliderWorld,
@@ -61,28 +62,55 @@ export function createWall(
   rotationY: number,
   matKey: PaletteKey = 'MAT_WALL',
   withCollider = true,
-): THREE.Mesh {
+): THREE.Mesh | null {
   const usePaint = matKey === 'MAT_WALL'
   const mat = usePaint
     ? wallMaterial(Math.max(1, length / 2), height / 3)
     : getMaterial(matKey, { roughness: 0.82 })
 
-  const geo = new RoundedBoxGeometry(length, height, thickness, 2, 0.015)
-  const mesh = new THREE.Mesh(geo, mat)
-  mesh.position.set(cx, height / 2, cz)
-  mesh.rotation.y = rotationY
-  mesh.castShadow = true
-  mesh.receiveShadow = true
-  parent.add(mesh)
+  const batcher = getWallBatcher()
+  if (batcher) {
+    batcher.addBox(
+      `wall:${matKey}`,
+      mat,
+      cx,
+      height / 2,
+      cz,
+      length,
+      height,
+      thickness,
+      rotationY,
+      false,
+    )
+    batcher.addBox(
+      'baseboard',
+      getMaterial('MAT_BASEBOARD', { roughness: 0.7 }),
+      cx,
+      0.04,
+      cz,
+      length,
+      0.08,
+      thickness + 0.02,
+      rotationY,
+      false,
+    )
+  } else {
+    const geo = new RoundedBoxGeometry(length, height, thickness, 2, 0.015)
+    const mesh = new THREE.Mesh(geo, mat)
+    mesh.position.set(cx, height / 2, cz)
+    mesh.rotation.y = rotationY
+    mesh.castShadow = true
+    mesh.receiveShadow = true
+    parent.add(mesh)
 
-  // Baseboard
-  const base = new THREE.Mesh(
-    new THREE.BoxGeometry(length, 0.08, thickness + 0.02),
-    getMaterial('MAT_BASEBOARD', { roughness: 0.7 }),
-  )
-  base.position.set(cx, 0.04, cz)
-  base.rotation.y = rotationY
-  parent.add(base)
+    const base = new THREE.Mesh(
+      new THREE.BoxGeometry(length, 0.08, thickness + 0.02),
+      getMaterial('MAT_BASEBOARD', { roughness: 0.7 }),
+    )
+    base.position.set(cx, 0.04, cz)
+    base.rotation.y = rotationY
+    parent.add(base)
+  }
 
   if (withCollider) {
     const cos = Math.abs(Math.cos(rotationY))
@@ -91,7 +119,7 @@ export function createWall(
     const sz = length * sin + thickness * cos
     colliders.addAabb(nextId('wall'), 'wall', cx, height / 2, cz, sx, height, sz)
   }
-  return mesh
+  return null
 }
 
 /**
@@ -148,14 +176,32 @@ export function createWallWithDoorway(
   // Lintel above door
   if (height > doorHeight + 0.05) {
     const lintelH = height - doorHeight
-    const lintel = new THREE.Mesh(
-      new RoundedBoxGeometry(doorWidth, lintelH, thickness, 2, 0.02),
-      getMaterial(matKey, { roughness: 0.78 }),
-    )
-    lintel.position.set(cx, doorHeight + lintelH / 2, cz)
-    lintel.rotation.y = rotationY
-    lintel.castShadow = true
-    parent.add(lintel)
+    const usePaint = matKey === 'MAT_WALL'
+    const mat = usePaint ? wallMaterial() : getMaterial(matKey, { roughness: 0.78 })
+    const batcher = getWallBatcher()
+    if (batcher) {
+      batcher.addBox(
+        `wall:${matKey}`,
+        mat,
+        cx,
+        doorHeight + lintelH / 2,
+        cz,
+        doorWidth,
+        lintelH,
+        thickness,
+        rotationY,
+        false,
+      )
+    } else {
+      const lintel = new THREE.Mesh(
+        new RoundedBoxGeometry(doorWidth, lintelH, thickness, 2, 0.02),
+        mat,
+      )
+      lintel.position.set(cx, doorHeight + lintelH / 2, cz)
+      lintel.rotation.y = rotationY
+      lintel.castShadow = true
+      parent.add(lintel)
+    }
     const cos = Math.abs(Math.cos(rotationY))
     const sin = Math.abs(Math.sin(rotationY))
     const sx = doorWidth * cos + thickness * sin
@@ -298,49 +344,35 @@ export function createColumn(
   return mesh
 }
 
-/** Recessed fluorescent ceiling panel — Quiet Dread key light */
+/** Recessed fluorescent panel — queued for InstancedMesh when batching */
 export function createCeilingLight(
   parent: THREE.Object3D,
   x: number,
   y: number,
   z: number,
   color = 0xe8eef2,
-  intensity = 1.4,
-): THREE.RectAreaLight {
-  const housing = new THREE.Mesh(
-    new RoundedBoxGeometry(1.35, 0.05, 1.35, 1, 0.01),
-    getMaterial('MAT_STEEL', { roughness: 0.55, metalness: 0.25 }),
-  )
-  housing.position.set(x, y - 0.02, z)
-  parent.add(housing)
+  _intensity = 2.2,
+): THREE.Object3D | null {
+  void _intensity
+  void color
+  void parent
+  queueCeilingPanel(x, y, z)
+  return null
+}
 
-  const diffuser = new THREE.Mesh(
-    new THREE.PlaneGeometry(1.2, 1.2),
-    getMaterial('MAT_WARM_WHITE', {
-      roughness: 0.35,
-      emissive: color,
-      emissiveIntensity: 0.85,
-      side: THREE.DoubleSide,
-    }),
-  )
-  diffuser.rotation.x = Math.PI / 2
-  diffuser.position.set(x, y - 0.048, z)
-  parent.add(diffuser)
-
-  // Cross grille
-  const grilleMat = getMaterial('MAT_STEEL', { roughness: 0.5, metalness: 0.3 })
-  for (const offset of [-0.3, 0, 0.3]) {
-    const hx = new THREE.Mesh(new THREE.BoxGeometry(1.15, 0.01, 0.02), grilleMat)
-    hx.position.set(x, y - 0.055, z + offset)
-    parent.add(hx)
-    const hz = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.01, 1.15), grilleMat)
-    hz.position.set(x + offset, y - 0.055, z)
-    parent.add(hz)
-  }
-
-  const light = new THREE.RectAreaLight(color, intensity, 1.15, 1.15)
-  light.position.set(x, y - 0.08, z)
-  light.lookAt(x, 0, z)
+/** Sparse realtime fill lights for the office (call a few times only) */
+export function createRoomFillLight(
+  parent: THREE.Object3D,
+  x: number,
+  y: number,
+  z: number,
+  color = 0xe0e8f0,
+  intensity = 1.8,
+  distance = 16,
+): THREE.PointLight {
+  const light = new THREE.PointLight(color, intensity, distance, 2)
+  light.position.set(x, y, z)
+  light.castShadow = false
   parent.add(light)
   return light
 }

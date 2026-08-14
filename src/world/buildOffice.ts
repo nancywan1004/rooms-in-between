@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { createColumn, createDoorVisual, syncDoorVisual, type DoorVisual } from './architecture'
+import { createColumn, createDoorVisual, createRoomFillLight, syncDoorVisual, type DoorVisual } from './architecture'
 import type { ColliderWorld } from './colliders'
 import type { DoorRegistry } from './doors'
 import type { TriggerRegistry } from './triggers'
@@ -9,13 +9,16 @@ import { buildPrinterRoom } from './rooms/buildPrinterRoom'
 import { buildBreakRoom } from './rooms/buildBreakRoom'
 import { buildManagerOffice } from './rooms/buildManagerOffice'
 import { buildMeetingRoom } from './rooms/buildMeetingRoom'
+import { beginWorldBatch, flushWorldBatch } from './batching'
 import { ManagerPatrol } from '../systems/ManagerPatrol'
+import { CrtFlicker } from '../systems/CrtFlicker'
 
 export type OfficeWorld = {
   root: THREE.Group
   doorVisuals: Map<string, DoorVisual>
   manager: ManagerPatrol
   lighting: THREE.Group
+  crtFlicker: CrtFlicker
 }
 
 export function buildOffice(
@@ -54,11 +57,16 @@ export function buildOffice(
   root.add(environment, rooms, props, characters, gameplay, lighting)
   scene.add(root)
 
+  beginWorldBatch()
+
   buildOpenOffice(rooms, architecture, propsStatic, colliders, doors, triggers)
   buildPrinterRoom(rooms, architecture, propsStatic, colliders, doors, triggers)
   buildBreakRoom(rooms, architecture, propsStatic, characters, colliders, doors, triggers)
   buildManagerOffice(rooms, architecture, propsStatic, colliders, doors, triggers)
   buildMeetingRoom(rooms, architecture, propsStatic, characters, colliders, doors, triggers)
+
+  // Flush merged walls + instanced chairs / panels / desks
+  flushWorldBatch(architecture)
 
   // Chase sightline columns in open office
   createColumn(architecture, colliders, -2.2, 0, 3.4)
@@ -119,10 +127,21 @@ export function buildOffice(
 
   const manager = new ManagerPatrol(characters, officeLayout.managerWaypoints)
 
-  const fill = new THREE.AmbientLight(0xf5efe6, 0.25)
+  // Sparse realtime fills — strong enough that non-emissive geometry is readable
+  createRoomFillLight(lighting, 0, 2.8, 0, 0xe8eef4, 4.5, 22)
+  createRoomFillLight(lighting, -8, 2.5, 0, 0xd8e4f0, 3.2, 14)
+  createRoomFillLight(lighting, 8, 2.5, 0, 0xdce8d8, 3.2, 14)
+  createRoomFillLight(lighting, 0, 3.0, -8, 0xe8e0d0, 2.8, 13)
+  createRoomFillLight(lighting, 0, 3.2, 9, 0xd8e0e8, 3.0, 14)
+  createRoomFillLight(lighting, -3.5, 2.6, 4, 0xe8eef2, 2.5, 10)
+
+  const fill = new THREE.AmbientLight(0xd0d6dc, 0.35)
   lighting.add(fill)
 
-  return { root, doorVisuals, manager, lighting }
+  const crtFlicker = new CrtFlicker()
+  crtFlicker.collect(root)
+
+  return { root, doorVisuals, manager, lighting, crtFlicker }
 }
 
 function updateDoorCollider(

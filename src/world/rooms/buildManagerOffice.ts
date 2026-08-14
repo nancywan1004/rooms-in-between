@@ -12,6 +12,12 @@ import {
   createPlant,
   createProposal,
 } from '../furniture'
+import {
+  createHighWindow,
+  createLavenderVase,
+  createWallClock,
+  createWallFrame,
+} from '../dressing'
 import { ROOM } from '../layout'
 import type { ColliderWorld } from '../colliders'
 import type { DoorRegistry } from '../doors'
@@ -81,6 +87,12 @@ export function buildManagerOffice(
 
   createPlant(props, -3.0, z0 + 1.2, true)
   createPlant(props, 3.0, z0 + 1.2, true)
+  createLavenderVase(props, -1.5, 0.82, z0 + 1.5)
+  createWallFrame(props, -3.15, 1.8, cz + 1.2, Math.PI / 2, 0.7, 0.5)
+  createWallFrame(props, 3.15, 1.8, cz + 1.2, -Math.PI / 2, 0.7, 0.5)
+  createWallClock(architecture, 0, 3.2, z0 + 0.12, 0)
+  createHighWindow(architecture, -2.5, 3.3, z0 + 0.12, 0, 1.4, 0.45)
+  createHighWindow(architecture, 2.5, 3.3, z0 + 0.12, 0, 1.4, 0.45)
 
   // Darker / fewer lights
   createCeilingLight(architecture, 0, h, cz, 0xd0d4d8, 0.4)

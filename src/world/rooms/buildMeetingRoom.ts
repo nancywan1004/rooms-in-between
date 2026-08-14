@@ -4,6 +4,7 @@ import {
   createCeilingLight,
   createFloor,
   createWall,
+  createWallSlogan,
   createWallWithDoorway,
 } from '../architecture'
 import {
@@ -12,6 +13,11 @@ import {
   createNpc,
   createChair,
 } from '../furniture'
+import {
+  createPersonalizedMug,
+  createWallClock,
+  createWallFrame,
+} from '../dressing'
 import { ROOM } from '../layout'
 import type { ColliderWorld } from '../colliders'
 import type { DoorRegistry } from '../doors'
@@ -86,6 +92,12 @@ export function buildMeetingRoom(
   props.add(hiddenBtn)
 
   createCup(props, 0.4, 0.82, cz)
+  createPersonalizedMug(props, -0.5, 0.82, cz, 'MAT_LILAC')
+
+  createWallSlogan(architecture, ['THIS MEETING COULD', 'HAVE BEEN AN EMAIL.'], 0, 3.2, z1 - 0.12, Math.PI, 4.2, 0.9)
+  createWallFrame(architecture, x0 + 0.12, 2.4, cz - 2, Math.PI / 2, 0.8, 0.55)
+  createWallFrame(architecture, x1 - 0.12, 2.4, cz + 2, -Math.PI / 2, 0.8, 0.55)
+  createWallClock(architecture, 0, 3.6, z0 + 0.12, 0)
 
   // Cool lighting (boss pre-state)
   createCeilingLight(architecture, -2, h, cz, 0xc8d4e0, 0.7)
