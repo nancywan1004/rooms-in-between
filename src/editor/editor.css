@@ -44,6 +44,15 @@
   border-color: #8aa0b4;
 }
 
+#toolbar button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+#toolbar button:disabled:hover {
+  background: #3a3e42;
+}
+
 #toolbar .spacer {
   flex: 1;
 }

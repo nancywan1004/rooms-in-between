@@ -1,3 +1,4 @@
+import { createRoot } from 'react-dom/client'
 import { Game } from './core/Game'
 import { EditorApp } from './editor/EditorApp'
 import { setOfficeState } from './systems/OfficeState'
@@ -12,8 +13,7 @@ if (legacy) {
   game.start()
 } else {
   document.getElementById('hud')?.remove()
-  const editor = new EditorApp(app)
-  editor.start()
+  createRoot(app).render(<EditorApp />)
 }
 
 ;(window as unknown as { setOfficeState: typeof setOfficeState }).setOfficeState = setOfficeState

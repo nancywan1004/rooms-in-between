@@ -14,7 +14,8 @@ import { TriggerComponent } from './components/TriggerComponent'
 import { ScriptComponent } from './components/ScriptComponent'
 import { registerBuiltinComponents } from './components/register'
 import { registerBehaviours } from '../behaviours/register'
-import { loadSceneFromJson, saveWorkingCopy, sceneToJson } from './serialize'
+import { loadSceneFromJson, saveWorkingCopy, sceneToJson, SCENE_STORAGE_KEY } from './serialize'
+import { History } from './History'
 import { officeLayout } from '../world/layout'
 
 export type EngineMode = 'edit' | 'play'
@@ -32,11 +33,15 @@ export class Engine {
 
   mode: EngineMode = 'edit'
   selected: SceneGameObject | null = null
+  /** Bumped on scene/selection/mode changes so React can subscribe via useSyncExternalStore. */
+  generation = 0
 
   private readonly postFX: PostFX
   private readonly crt = new CrtFlicker()
   private readonly helperRoot = new THREE.Group()
   private readonly grid: THREE.GridHelper
+  private selectionBox: THREE.BoxHelper | null = null
+  private readonly history = new History()
   private playSnapshot: string | null = null
   private behaviours: Behaviour[] = []
   private started = new WeakSet<Behaviour>()
@@ -145,12 +150,81 @@ export class Engine {
   }
 
   notifyChange(): void {
+    this.bumpGeneration()
     this.changeListeners.forEach((fn) => fn())
   }
 
   select(go: SceneGameObject | null): void {
     this.selected = go
+    this.bumpGeneration()
     this.selectionListeners.forEach((fn) => fn(go))
+  }
+
+  get canUndo(): boolean {
+    return this.mode === 'edit' && this.history.canUndo
+  }
+
+  get canRedo(): boolean {
+    return this.mode === 'edit' && this.history.canRedo
+  }
+
+  /** Call once after the initial scene load so the first edit can undo back to it. */
+  captureBaseline(): void {
+    this.history.reset(sceneToJson(this.scene), this.selected?.uuid ?? null)
+  }
+
+  beginHistoryGesture(): void {
+    this.history.beginCoalesce()
+  }
+
+  endHistoryGesture(): void {
+    this.history.endCoalesce()
+    this.persist()
+  }
+
+  /** Snapshot the current scene into undo + localStorage. Call after a mutation. */
+  persist(opts?: { silent?: boolean }): void {
+    if (this.mode !== 'edit') return
+    const json = sceneToJson(this.scene)
+    this.history.commit(json, this.selected?.uuid ?? null)
+    try {
+      localStorage.setItem(SCENE_STORAGE_KEY, json)
+    } catch {
+      /* quota */
+    }
+    this.syncEditHelpers()
+    if (!opts?.silent) this.notifyChange()
+  }
+
+  undo(): void {
+    if (this.mode !== 'edit' || this.history.coalescing) return
+    const entry = this.history.undo()
+    if (!entry) return
+    this.applyHistory(entry)
+  }
+
+  redo(): void {
+    if (this.mode !== 'edit' || this.history.coalescing) return
+    const entry = this.history.redo()
+    if (!entry) return
+    this.applyHistory(entry)
+  }
+
+  private applyHistory(entry: { json: string; selected: string | null }): void {
+    try {
+      loadSceneFromJson(this.scene, entry.json)
+    } catch {
+      return
+    }
+    try {
+      localStorage.setItem(SCENE_STORAGE_KEY, entry.json)
+    } catch {
+      /* quota */
+    }
+    const go = entry.selected ? (this.scene.findByUuid(entry.selected) ?? null) : null
+    this.select(go)
+    this.syncEditHelpers()
+    this.notifyChange()
   }
 
   start(): void {
@@ -207,6 +281,7 @@ export class Engine {
     this.rebuildColliders()
     this.bootBehaviours()
     this.postFX.setCamera(this.player.camera)
+    this.bumpGeneration()
     this.modeListeners.forEach((fn) => fn('play'))
   }
 
@@ -228,8 +303,13 @@ export class Engine {
     if (this.overlay) this.overlay.classList.remove('hidden')
     if (this.crosshair) this.crosshair.classList.remove('visible')
     if (document.pointerLockElement) document.exitPointerLock()
+    this.bumpGeneration()
     this.modeListeners.forEach((fn) => fn('edit'))
     this.notifyChange()
+  }
+
+  private bumpGeneration(): void {
+    this.generation += 1
   }
 
   rebuildColliders(): void {
@@ -243,16 +323,34 @@ export class Engine {
   }
 
   syncEditHelpers(): void {
-    const show = this.mode === 'edit'
+    const edit = this.mode === 'edit'
     this.scene.traverse((go) => {
-      go.getComponent(CollisionComponent)?.showHelper(this.helperRoot, show)
-      go.getComponent(TriggerComponent)?.showHelper(this.helperRoot, show)
+      const on = edit && this.selected === go
+      go.getComponent(CollisionComponent)?.showHelper(this.helperRoot, on)
+      go.getComponent(TriggerComponent)?.showHelper(this.helperRoot, on)
     })
+    this.syncSelectionBox(edit)
+  }
+
+  private syncSelectionBox(edit: boolean): void {
+    const node = this.selected?.node
+    if (!edit || !node) {
+      if (this.selectionBox) this.selectionBox.visible = false
+      return
+    }
+    if (!this.selectionBox) {
+      this.selectionBox = new THREE.BoxHelper(node, 0x5ec8ff)
+      this.selectionBox.userData.editorOnly = true
+      this.helperRoot.add(this.selectionBox)
+    } else {
+      this.selectionBox.setFromObject(node)
+    }
+    this.selectionBox.visible = true
   }
 
   addRoot(go: SceneGameObject): void {
     this.scene.add(go)
-    this.notifyChange()
+    this.persist()
   }
 
   deleteSelected(): void {
@@ -262,7 +360,7 @@ export class Engine {
     if (go.parent) go.parent.removeChild(go)
     else this.scene.remove(go)
     go.destroy()
-    this.notifyChange()
+    this.persist()
   }
 
   private bootBehaviours(): void {

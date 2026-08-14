@@ -8,12 +8,15 @@ const PAN_SENS = 0.0022
 const DOLLY_FACTOR = 1.12
 const FLY_SPEED = 8
 const FLY_FAST = 18
+const DRAG_THRESHOLD = 5
 
 export class EditorCamera {
   mode: CameraNavMode = 'orbit'
   enabled = true
   /** Set true while the transform gizmo is dragging. */
   blocked = false
+  /** Return true when LMB is on a gizmo handle so the camera must not steal the gesture. */
+  hitsGizmo: () => boolean = () => false
 
   readonly target = new THREE.Vector3()
 
@@ -33,6 +36,11 @@ export class EditorCamera {
   private mmb = false
   private rmb = false
   private alt = false
+  private lmbNavigating = false
+  private clickCandidate = false
+  private lastWasClick = false
+  private downX = 0
+  private downY = 0
   private lastX = 0
   private lastY = 0
   private flyYaw = 0
@@ -55,12 +63,21 @@ export class EditorCamera {
     this.enabled = on
     if (!on) {
       this.lmb = this.mmb = this.rmb = false
+      this.lmbNavigating = false
+      this.clickCandidate = false
       this.keys.clear()
     }
   }
 
   isLooking(): boolean {
-    return this.rmb || this.mmb || (this.lmb && this.alt)
+    return this.mmb || this.lmbNavigating || (this.lmb && this.alt)
+  }
+
+  /** True when the last LMB release was a click (no camera drag), for object picking. */
+  consumeClick(): boolean {
+    const click = this.lastWasClick
+    this.lastWasClick = false
+    return click
   }
 
   update(dt: number): void {
@@ -110,7 +127,8 @@ export class EditorCamera {
     this.dom.removeEventListener('pointerdown', this.onPointerDown)
     this.dom.removeEventListener('pointermove', this.onPointerMove)
     this.dom.removeEventListener('pointerup', this.onPointerUp)
-    this.dom.removeEventListener('pointerleave', this.onPointerUp)
+    this.dom.removeEventListener('pointerleave', this.onPointerLeave)
+    this.dom.removeEventListener('pointercancel', this.onPointerLeave)
     this.dom.removeEventListener('wheel', this.onWheel)
     this.dom.removeEventListener('contextmenu', this.onContextMenu)
     window.removeEventListener('keydown', this.onKeyDown)
@@ -135,7 +153,8 @@ export class EditorCamera {
     this.dom.addEventListener('pointerdown', this.onPointerDown)
     this.dom.addEventListener('pointermove', this.onPointerMove)
     this.dom.addEventListener('pointerup', this.onPointerUp)
-    this.dom.addEventListener('pointerleave', this.onPointerUp)
+    this.dom.addEventListener('pointerleave', this.onPointerLeave)
+    this.dom.addEventListener('pointercancel', this.onPointerLeave)
     this.dom.addEventListener('wheel', this.onWheel, { passive: false })
     this.dom.addEventListener('contextmenu', this.onContextMenu)
     window.addEventListener('keydown', this.onKeyDown)
@@ -148,11 +167,21 @@ export class EditorCamera {
 
   private onPointerDown = (e: PointerEvent): void => {
     if (!this.enabled) return
-    if (e.button === 0) this.lmb = true
-    if (e.button === 1) this.mmb = true
-    if (e.button === 2) this.rmb = true
     this.lastX = e.clientX
     this.lastY = e.clientY
+    this.downX = e.clientX
+    this.downY = e.clientY
+    this.lastWasClick = false
+
+    if (e.button === 0) {
+      if (this.blocked || this.hitsGizmo()) return
+      this.lmb = true
+      this.lmbNavigating = false
+      this.clickCandidate = true
+      return
+    }
+    if (e.button === 1) this.mmb = true
+    if (e.button === 2) this.rmb = true
     if (e.button === 1 || e.button === 2) {
       this.dom.setPointerCapture(e.pointerId)
       e.preventDefault()
@@ -160,22 +189,50 @@ export class EditorCamera {
   }
 
   private onPointerUp = (e: PointerEvent): void => {
-    if (e.button === 0) this.lmb = false
+    if (e.button === 0) {
+      this.lastWasClick = this.clickCandidate && !this.lmbNavigating && !this.blocked
+      this.lmb = false
+      this.lmbNavigating = false
+      this.clickCandidate = false
+    }
     if (e.button === 1) this.mmb = false
     if (e.button === 2) this.rmb = false
     if (this.dom.hasPointerCapture(e.pointerId)) this.dom.releasePointerCapture(e.pointerId)
   }
 
+  private onPointerLeave = (e: PointerEvent): void => {
+    if (this.lmbNavigating || this.mmb || this.rmb) return
+    this.clickCandidate = false
+    this.lastWasClick = false
+    this.lmb = false
+    if (this.dom.hasPointerCapture(e.pointerId)) this.dom.releasePointerCapture(e.pointerId)
+  }
+
   private onPointerMove = (e: PointerEvent): void => {
-    if (!this.enabled || this.blocked) return
+    if (!this.enabled) return
+    if (this.blocked) {
+      this.clickCandidate = false
+      this.lmbNavigating = false
+      return
+    }
+
+    if (this.lmb && this.clickCandidate && !this.lmbNavigating) {
+      const dist = Math.hypot(e.clientX - this.downX, e.clientY - this.downY)
+      if (dist >= DRAG_THRESHOLD) {
+        this.lmbNavigating = true
+        this.clickCandidate = false
+        this.dom.setPointerCapture(e.pointerId)
+      }
+    }
+
     const dx = e.clientX - this.lastX
     const dy = e.clientY - this.lastY
     this.lastX = e.clientX
     this.lastY = e.clientY
 
-    const orbiting = this.mmb || (this.lmb && this.alt)
-    const panning = this.mode === 'orbit' && this.rmb
-    const looking = this.mode === 'fly' && this.rmb
+    const orbiting = this.mmb || (this.lmbNavigating && this.mode === 'orbit') || (this.lmb && this.alt)
+    const panning = this.rmb
+    const looking = this.mode === 'fly' && this.lmbNavigating
 
     if (looking) {
       this.flyYaw -= dx * LOOK_SENS
@@ -196,7 +253,8 @@ export class EditorCamera {
     }
 
     if (panning) {
-      const dist = this.camera.position.distanceTo(this.target)
+      const dist =
+        this.mode === 'orbit' ? this.camera.position.distanceTo(this.target) : Math.max(8, Math.abs(this.camera.position.y) * 1.4)
       const panX = -dx * PAN_SENS * dist
       const panY = dy * PAN_SENS * dist
       this.right.set(1, 0, 0).applyQuaternion(this.camera.quaternion)
