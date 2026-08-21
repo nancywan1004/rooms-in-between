@@ -138,6 +138,32 @@
   padding: 4px 0 8px;
 }
 
+.tree-host {
+  min-height: 120px;
+  padding-bottom: 8px;
+}
+
+.tree-host.drop-root {
+  outline: 1px dashed #5a7a94;
+  outline-offset: -2px;
+  background: rgba(90, 122, 148, 0.08);
+}
+
+.tree-root-hint {
+  margin: 4px 10px 0;
+  padding: 6px 8px;
+  border: 1px dashed #3a3e42;
+  border-radius: 3px;
+  color: #6a7076;
+  font-size: 10px;
+  text-align: center;
+}
+
+.tree-host.drop-root .tree-root-hint {
+  border-color: #5a7a94;
+  color: #9ab0c4;
+}
+
 .tree ul {
   list-style: none;
   margin: 0;
@@ -149,8 +175,37 @@
   align-items: center;
   gap: 4px;
   padding: 3px 8px;
-  cursor: pointer;
+  cursor: grab;
   white-space: nowrap;
+  position: relative;
+}
+
+.tree li .row.dragging {
+  opacity: 0.45;
+}
+
+.tree li .row.drop-before::before,
+.tree li .row.drop-after::after {
+  content: '';
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  height: 2px;
+  background: #6a9ec4;
+  pointer-events: none;
+}
+
+.tree li .row.drop-before::before {
+  top: 0;
+}
+
+.tree li .row.drop-after::after {
+  bottom: 0;
+}
+
+.tree li .row.drop-inside {
+  background: #3d4a58;
+  outline: 1px solid #6a9ec4;
 }
 
 .tree li.collapsed > ul {

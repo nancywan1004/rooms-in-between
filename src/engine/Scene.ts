@@ -15,10 +15,23 @@ export class Scene {
   }
 
   add(obj: SceneGameObject): void {
-    if (this._roots.includes(obj)) return
-    obj.setParent(null)
-    this._roots.push(obj)
-    this.threeScene.add(obj.node)
+    this.addAt(obj)
+  }
+
+  /** Insert as a root. Detaches from any previous parent first. */
+  addAt(obj: SceneGameObject, index?: number): void {
+    const prevRoot = this._roots.indexOf(obj)
+    if (prevRoot >= 0) {
+      this._roots.splice(prevRoot, 1)
+      let at = index ?? this._roots.length
+      if (prevRoot < at) at -= 1
+      this._roots.splice(Math.max(0, Math.min(at, this._roots.length)), 0, obj)
+      return
+    }
+    if (obj.parent) obj.setParent(null)
+    const at = index ?? this._roots.length
+    this._roots.splice(Math.max(0, Math.min(at, this._roots.length)), 0, obj)
+    if (!obj.node.parent) this.threeScene.add(obj.node)
   }
 
   remove(obj: SceneGameObject): void {
@@ -27,7 +40,7 @@ export class Scene {
       this._roots.splice(i, 1)
       this.threeScene.remove(obj.node)
     }
-    obj.setParent(null)
+    if (obj.parent) obj.setParent(null)
   }
 
   clear(): void {

@@ -52,13 +52,22 @@ export class SceneGameObject {
     child.setParent(this)
   }
 
+  addChildAt(child: SceneGameObject, index: number): void {
+    if (child === this) return
+    child.setParent(this, index)
+  }
+
   removeChild(child: SceneGameObject): void {
     if (child._parent !== this) return
     child.setParent(null)
   }
 
-  setParent(parent: SceneGameObject | null): void {
-    if (this._parent === parent) return
+  setParent(parent: SceneGameObject | null, index?: number): void {
+    if (parent === this) return
+    if (this._parent === parent) {
+      if (parent && index !== undefined) this.reorderInParent(index)
+      return
+    }
     if (this._parent) {
       const i = this._parent._children.indexOf(this)
       if (i >= 0) this._parent._children.splice(i, 1)
@@ -66,9 +75,21 @@ export class SceneGameObject {
     }
     this._parent = parent
     if (parent) {
-      parent._children.push(this)
+      const at = index === undefined ? parent._children.length : Math.max(0, Math.min(index, parent._children.length))
+      parent._children.splice(at, 0, this)
       parent.node.add(this.node)
     }
+  }
+
+  private reorderInParent(index: number): void {
+    if (!this._parent) return
+    const list = this._parent._children
+    const from = list.indexOf(this)
+    if (from < 0) return
+    list.splice(from, 1)
+    let at = Math.max(0, Math.min(index, list.length))
+    if (from < at) at -= 1
+    list.splice(at, 0, this)
   }
 
   addComponent<T extends Component>(ctor: ComponentCtor<T>): T {
