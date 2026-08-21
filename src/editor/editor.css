@@ -23,8 +23,7 @@
   user-select: none;
 }
 
-#toolbar button,
-#toolbar label.file-btn {
+#toolbar button {
   background: #3a3e42;
   color: #e8e4dc;
   border: 1px solid #555a60;
@@ -34,8 +33,7 @@
   font-size: 12px;
 }
 
-#toolbar button:hover,
-#toolbar label.file-btn:hover {
+#toolbar button:hover {
   background: #4a5056;
 }
 

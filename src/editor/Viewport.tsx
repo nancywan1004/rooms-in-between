@@ -85,6 +85,11 @@ export function Viewport({
       const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement
       if (typing) return
       const mod = e.metaKey || e.ctrlKey
+      if (mod && e.code === 'KeyS') {
+        e.preventDefault()
+        window.dispatchEvent(new Event('rib:save-scene'))
+        return
+      }
       if (mod && e.code === 'KeyZ') {
         e.preventDefault()
         if (e.shiftKey) engine.redo()

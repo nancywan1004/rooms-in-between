@@ -1,7 +1,11 @@
-import { useState } from 'react'
-import { bootstrapOfficeScene } from '../../engine/prefabs/bootstrapOffice'
-import { loadSceneFromJson, sceneToJson } from '../../engine/serialize'
+import { useEffect, useRef, useState } from 'react'
+import { loadSceneFromJson } from '../../engine/serialize'
 import { useEditor, useEngine } from '../EditorContext'
+import {
+  DEFAULT_SCENE_SAVE_PATH,
+  loadSceneFromLocalPath,
+  saveSceneToLocalPath,
+} from '../sceneFiles'
 import type { CameraNavMode } from '../viewport/EditorCamera'
 import type { GizmoMode } from '../viewport/Gizmo'
 
@@ -12,6 +16,42 @@ export function Toolbar() {
   const ctx = useEditor()
   const engine = useEngine()
   const [camMode, setCamMode] = useState<CameraNavMode>('orbit')
+  const [saveHint, setSaveHint] = useState('')
+  const [saving, setSaving] = useState(false)
+  const savingRef = useRef(false)
+
+  useEffect(() => {
+    const onSave = (): void => {
+      if (!engine || engine.mode !== 'edit' || savingRef.current) return
+      void (async () => {
+        savingRef.current = true
+        setSaving(true)
+        try {
+          if (!engine.scene.name || engine.scene.name === 'Untitled') {
+            engine.scene.name = 'Office MVP'
+          }
+          const result = await saveSceneToLocalPath(engine.scene, DEFAULT_SCENE_SAVE_PATH)
+          if (!result.ok) {
+            setSaveHint(`Save failed: ${result.error}`)
+            window.setTimeout(() => setSaveHint(''), 2500)
+            return
+          }
+          engine.persist()
+          setSaveHint(
+            result.via === 'disk'
+              ? `Saved public/${result.path}`
+              : `Downloaded ${result.path} (dev server needed for disk write)`,
+          )
+          window.setTimeout(() => setSaveHint(''), 2500)
+        } finally {
+          savingRef.current = false
+          setSaving(false)
+        }
+      })()
+    }
+    window.addEventListener('rib:save-scene', onSave)
+    return () => window.removeEventListener('rib:save-scene', onSave)
+  }, [engine])
 
   if (!ctx || !engine) return <div id="toolbar" />
 
@@ -22,8 +62,15 @@ export function Toolbar() {
     gizmo.setTarget(engine.selected)
   }
 
+  const flash = (msg: string): void => {
+    setSaveHint(msg)
+    window.setTimeout(() => setSaveHint(''), 2500)
+  }
+
   const status = playing
     ? 'PLAY'
+    : saveHint
+      ? saveHint
       : camMode === 'fly'
         ? 'FLY · LMB look · RMB pan · click select · WASD · Q/E up/down'
         : 'ORBIT · LMB drag orbit · RMB pan · click select · WASD · Wheel zoom'
@@ -61,14 +108,30 @@ export function Toolbar() {
       <button
         type="button"
         className="edit-only"
-        onClick={() => {
-          bootstrapOfficeScene(engine.scene)
-          engine.select(null)
-          engine.persist()
-          resetGizmo()
+        disabled={saving}
+        title={`Save to public/${DEFAULT_SCENE_SAVE_PATH} (Ctrl/Cmd+S)`}
+        onClick={() => window.dispatchEvent(new Event('rib:save-scene'))}
+      >
+        {saving ? 'Saving…' : 'Save'}
+      </button>
+      <button
+        type="button"
+        className="edit-only"
+        title={`Load /${DEFAULT_SCENE_SAVE_PATH}`}
+        onClick={async () => {
+          try {
+            const text = await loadSceneFromLocalPath(DEFAULT_SCENE_SAVE_PATH)
+            loadSceneFromJson(engine.scene, text)
+            engine.select(null)
+            engine.persist()
+            resetGizmo()
+            flash(`Loaded /${DEFAULT_SCENE_SAVE_PATH}`)
+          } catch (err) {
+            flash(err instanceof Error ? err.message : 'Load failed')
+          }
         }}
       >
-        Load Office MVP
+        Load
       </button>
       <button
         type="button"
@@ -83,38 +146,6 @@ export function Toolbar() {
       >
         New
       </button>
-      <button
-        type="button"
-        className="edit-only"
-        onClick={() => {
-          const blob = new Blob([sceneToJson(engine.scene)], { type: 'application/json' })
-          const a = document.createElement('a')
-          a.href = URL.createObjectURL(blob)
-          a.download = `${engine.scene.name || 'scene'}.json`
-          a.click()
-          URL.revokeObjectURL(a.href)
-        }}
-      >
-        Export JSON
-      </button>
-      <label className="file-btn edit-only">
-        Import JSON
-        <input
-          type="file"
-          accept="application/json"
-          hidden
-          onChange={async (e) => {
-            const file = e.target.files?.[0]
-            if (!file) return
-            const text = await file.text()
-            loadSceneFromJson(engine.scene, text)
-            engine.select(null)
-            engine.persist()
-            resetGizmo()
-            e.target.value = ''
-          }}
-        />
-      </label>
       <div className="sep" />
       {CAM_MODES.map((m) => (
         <button
