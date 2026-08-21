@@ -4,6 +4,7 @@ import { getMaterial, deskMaterial, plasticMaterial, metalMaterial, crtScreenMat
 import { noticeBoardTexture } from '../theme/textures'
 import type { ColliderWorld } from './colliders'
 import { buildChairGeometry, isWorldBatching, queueChair } from './batching'
+import { cloneOfficeAsset, deskSurfaceY, isOfficePackReady } from './officePack'
 
 let seq = 0
 const nid = (p: string) => `${p}_${++seq}`
@@ -158,6 +159,93 @@ export function createDesk(
   withCollider = true,
   withAccents = false,
 ): THREE.Group {
+  if (isOfficePackReady()) {
+    return createDeskFromPack(parent, colliders, x, z, rotationY, withCollider, withAccents)
+  }
+  return createDeskProcedural(parent, colliders, x, z, rotationY, withCollider, withAccents)
+}
+
+function placePackProp(
+  parent: THREE.Object3D,
+  id: Parameters<typeof cloneOfficeAsset>[0],
+  x: number,
+  y: number,
+  z: number,
+  target: [number, number, number],
+  yaw = 0,
+): void {
+  const prop = cloneOfficeAsset(id, { target, yaw })
+  if (!prop) return
+  prop.position.set(x, y, z)
+  parent.add(prop)
+}
+
+function createDeskFromPack(
+  parent: THREE.Object3D,
+  colliders: ColliderWorld,
+  x: number,
+  z: number,
+  rotationY: number,
+  withCollider: boolean,
+  withAccents: boolean,
+): THREE.Group {
+  const g = new THREE.Group()
+  g.position.set(x, 0, z)
+  g.rotation.y = rotationY
+
+  // Pack desk is long on Z; yaw so the run is along local X for cubicle width.
+  const desk = cloneOfficeAsset('desk_big', { yaw: Math.PI / 2, target: [1.45, 0.74, 0.78] })
+  if (!desk) return createDeskProcedural(parent, colliders, x, z, rotationY, withCollider, withAccents)
+  g.add(desk)
+  const topY = deskSurfaceY(desk)
+
+  // Monitor faces the sitter (+Z / keyboard side).
+  const useWide = Math.abs(Math.round(x * 3 + z * 5)) % 4 === 0
+  placePackProp(
+    g,
+    useWide ? 'monitor_ultrawide' : 'monitor',
+    0.05,
+    topY,
+    -0.08,
+    useWide ? [0.72, 0.42, 0.18] : [0.52, 0.42, 0.18],
+    Math.PI / 2,
+  )
+  placePackProp(g, 'lamp_architect', -0.52, topY, -0.12, [0.28, 0.48, 0.32], 0.35)
+  placePackProp(g, 'keyboard', 0.02, topY, 0.18, [0.46, 0.028, 0.16], Math.PI / 2)
+  placePackProp(g, 'wireless_mouse', 0.36, topY, 0.2, [0.07, 0.035, 0.11], Math.PI / 2)
+
+  const variant = Math.abs(Math.round(x * 10 + z * 7)) % 3
+  if (variant === 0 || withAccents) {
+    placePackProp(g, 'mug', -0.35, topY, 0.22, [0.08, 0.09, 0.08], 0.2)
+  }
+  if (variant === 1 || withAccents) {
+    placePackProp(g, 'pencil_holder', 0.52, topY, -0.18, [0.09, 0.1, 0.09], -0.4)
+  }
+  if (variant === 2) {
+    placePackProp(g, 'pen', 0.28, topY, 0.12, [0.12, 0.012, 0.012], Math.PI / 2)
+  }
+  if (withAccents) addFeminineAccents(g, topY)
+
+  parent.add(g)
+  if (withCollider) {
+    const cos = Math.abs(Math.cos(rotationY))
+    const sin = Math.abs(Math.sin(rotationY))
+    const sx = 1.45 * cos + 0.78 * sin
+    const sz = 1.45 * sin + 0.78 * cos
+    colliders.addAabb(nid('desk'), 'desk', x, 0.4, z, sx, 0.8, sz)
+  }
+  return g
+}
+
+function createDeskProcedural(
+  parent: THREE.Object3D,
+  colliders: ColliderWorld,
+  x: number,
+  z: number,
+  rotationY = 0,
+  withCollider = true,
+  withAccents = false,
+): THREE.Group {
   const g = new THREE.Group()
   g.position.set(x, 0, z)
   g.rotation.y = rotationY
@@ -247,7 +335,6 @@ export function createDesk(
 
   addDeskLamp(g, -0.5, 0.74, -0.2)
 
-
   if (withAccents) addFeminineAccents(g, 0.75)
 
   parent.add(g)
@@ -275,9 +362,15 @@ export function createChair(
   const g = new THREE.Group()
   g.position.set(x, 0, z)
   g.rotation.y = rotationY
-  const mesh = new THREE.Mesh(buildChairGeometry(), getMaterial('MAT_CHAIR', { roughness: 0.75 }))
-  mesh.castShadow = true
-  g.add(mesh)
+
+  const pack = cloneOfficeAsset('office_chair', { target: [0.58, 1.05, 0.58] })
+  if (pack) {
+    g.add(pack)
+  } else {
+    const mesh = new THREE.Mesh(buildChairGeometry(), getMaterial('MAT_CHAIR', { roughness: 0.75 }))
+    mesh.castShadow = true
+    g.add(mesh)
+  }
   parent.add(g)
   return g
 }
@@ -341,56 +434,59 @@ export function createPrinter(
   const g = new THREE.Group()
   g.position.set(x, 0, z)
 
-  const body = new THREE.Mesh(
-    new RoundedBoxGeometry(1.15, 0.85, 0.85, 4, 0.045),
-    plasticMaterial(),
-  )
-  body.position.y = 0.5
-  body.castShadow = true
-  g.add(body)
-
-  const lid = new THREE.Mesh(
-    new RoundedBoxGeometry(1.05, 0.08, 0.7, 3, 0.02),
-    plasticMaterial(),
-  )
-  lid.position.set(0, 0.98, -0.05)
-  g.add(lid)
-
-  // Paper path slot
-  const slot = new THREE.Mesh(
-    new THREE.BoxGeometry(0.7, 0.04, 0.15),
-    getMaterial('MAT_CHARCOAL', { roughness: 0.7 }),
-  )
-  slot.position.set(0, 0.92, 0.35)
-  g.add(slot)
-
-  const tray = new THREE.Mesh(
-    new RoundedBoxGeometry(0.75, 0.04, 0.4, 2, 0.01),
-    getMaterial('MAT_PAPER', { roughness: 0.7 }),
-  )
-  tray.position.set(0, 0.35, 0.5)
-  g.add(tray)
-
-  const panel = new THREE.Mesh(
-    new RoundedBoxGeometry(0.4, 0.2, 0.05, 2, 0.01),
-    getMaterial('MAT_CHARCOAL', {
-      roughness: 0.35,
-      emissive: 0x2a4038,
-      emissiveIntensity: 0.45,
-    }),
-  )
-  panel.position.set(0.3, 0.95, 0.35)
-  panel.rotation.x = -0.35
-  g.add(panel)
-
-  // Side vents
-  for (let i = 0; i < 6; i++) {
-    const vent = new THREE.Mesh(
-      new THREE.BoxGeometry(0.02, 0.08, 0.35),
-      getMaterial('MAT_CHARCOAL', { roughness: 0.8 }),
+  const pack = cloneOfficeAsset('printer_big', { target: [1.15, 1.08, 1.0] })
+  if (pack) {
+    g.add(pack)
+  } else {
+    const body = new THREE.Mesh(
+      new RoundedBoxGeometry(1.15, 0.85, 0.85, 4, 0.045),
+      plasticMaterial(),
     )
-    vent.position.set(0.55, 0.35 + i * 0.1, 0)
-    g.add(vent)
+    body.position.y = 0.5
+    body.castShadow = true
+    g.add(body)
+
+    const lid = new THREE.Mesh(
+      new RoundedBoxGeometry(1.05, 0.08, 0.7, 3, 0.02),
+      plasticMaterial(),
+    )
+    lid.position.set(0, 0.98, -0.05)
+    g.add(lid)
+
+    const slot = new THREE.Mesh(
+      new THREE.BoxGeometry(0.7, 0.04, 0.15),
+      getMaterial('MAT_CHARCOAL', { roughness: 0.7 }),
+    )
+    slot.position.set(0, 0.92, 0.35)
+    g.add(slot)
+
+    const tray = new THREE.Mesh(
+      new RoundedBoxGeometry(0.75, 0.04, 0.4, 2, 0.01),
+      getMaterial('MAT_PAPER', { roughness: 0.7 }),
+    )
+    tray.position.set(0, 0.35, 0.5)
+    g.add(tray)
+
+    const panel = new THREE.Mesh(
+      new RoundedBoxGeometry(0.4, 0.2, 0.05, 2, 0.01),
+      getMaterial('MAT_CHARCOAL', {
+        roughness: 0.35,
+        emissive: 0x2a4038,
+        emissiveIntensity: 0.45,
+      }),
+    )
+    panel.position.set(0.3, 0.95, 0.35)
+    panel.rotation.x = -0.35
+    g.add(panel)
+
+    for (let i = 0; i < 6; i++) {
+      const vent = new THREE.Mesh(
+        new THREE.BoxGeometry(0.02, 0.08, 0.35),
+        getMaterial('MAT_CHARCOAL', { roughness: 0.8 }),
+      )
+      vent.position.set(0.55, 0.35 + i * 0.1, 0)
+      g.add(vent)
+    }
   }
 
   parent.add(g)
@@ -409,24 +505,33 @@ export function createTerminal(
   g.position.set(x, 0, z)
   g.rotation.y = rotationY
 
-  const desk = new THREE.Mesh(
-    new RoundedBoxGeometry(1.0, 0.05, 0.55, 2, 0.02),
-    getMaterial('MAT_DESK', { roughness: 0.7 }),
-  )
-  desk.position.y = 0.75
-  desk.castShadow = true
-  g.add(desk)
-
-  for (const lx of [-0.4, 0.4]) {
-    const leg = new THREE.Mesh(
-      new RoundedBoxGeometry(0.05, 0.72, 0.05, 1, 0.01),
-      getMaterial('MAT_STEEL', { roughness: 0.45, metalness: 0.3 }),
+  const packDesk = cloneOfficeAsset('desk_big', { yaw: Math.PI / 2, target: [1.05, 0.74, 0.55] })
+  if (packDesk) {
+    g.add(packDesk)
+    const topY = deskSurfaceY(packDesk)
+    placePackProp(g, 'monitor', 0, topY, -0.06, [0.48, 0.4, 0.16], Math.PI / 2)
+    placePackProp(g, 'keyboard', 0, topY, 0.12, [0.4, 0.025, 0.14], Math.PI / 2)
+    placePackProp(g, 'mug', 0.35, topY, 0.1, [0.07, 0.08, 0.07], 0.3)
+  } else {
+    const desk = new THREE.Mesh(
+      new RoundedBoxGeometry(1.0, 0.05, 0.55, 2, 0.02),
+      getMaterial('MAT_DESK', { roughness: 0.7 }),
     )
-    leg.position.set(lx, 0.36, 0)
-    g.add(leg)
-  }
+    desk.position.y = 0.75
+    desk.castShadow = true
+    g.add(desk)
 
-  addCrtMonitor(g, 0, 1.05, -0.05)
+    for (const lx of [-0.4, 0.4]) {
+      const leg = new THREE.Mesh(
+        new RoundedBoxGeometry(0.05, 0.72, 0.05, 1, 0.01),
+        getMaterial('MAT_STEEL', { roughness: 0.45, metalness: 0.3 }),
+      )
+      leg.position.set(lx, 0.36, 0)
+      g.add(leg)
+    }
+
+    addCrtMonitor(g, 0, 1.05, -0.05)
+  }
 
   parent.add(g)
   colliders.addAabb(nid('term'), 'furniture', x, 0.4, z, 1.05, 0.85, 0.6)
@@ -526,6 +631,9 @@ export function createBreakTable(
   stem.position.y = 0.35
   g.add(stem)
 
+  placePackProp(g, 'mug', 0.12, 0.75, 0.08, [0.08, 0.09, 0.08], 0.4)
+  placePackProp(g, 'mug', -0.15, 0.75, -0.05, [0.08, 0.09, 0.08], -0.6)
+
   parent.add(g)
   colliders.addAabb(nid('btable'), 'furniture', x, 0.4, z, 0.95, 0.8, 0.95)
   return g
@@ -556,6 +664,10 @@ export function createCoffeeCounter(
   )
   machine.position.set(-0.5, 1.15, 0)
   g.add(machine)
+
+  placePackProp(g, 'mug', 0.35, 0.92, 0.1, [0.08, 0.09, 0.08], 0.2)
+  placePackProp(g, 'mug', 0.55, 0.92, -0.05, [0.08, 0.09, 0.08], -0.5)
+  placePackProp(g, 'pencil_holder', 0.85, 0.92, 0.05, [0.09, 0.1, 0.09], 0.1)
 
   parent.add(g)
   const cos = Math.abs(Math.cos(rotationY))
@@ -759,20 +871,32 @@ export function createManagerDesk(
   const g = new THREE.Group()
   g.position.set(x, 0, z)
 
-  const top = new THREE.Mesh(
-    new RoundedBoxGeometry(2.2, 0.06, 0.9, 3, 0.03),
-    getMaterial('MAT_CHARCOAL', { roughness: 0.55 }),
-  )
-  top.position.y = 0.76
-  top.castShadow = true
-  g.add(top)
+  const corner = cloneOfficeAsset('desk_corner', { target: [2.35, 0.76, 1.55] })
+  if (corner) {
+    g.add(corner)
+    const topY = deskSurfaceY(corner)
+    placePackProp(g, 'monitor_ultrawide', 0.15, topY, -0.15, [0.85, 0.45, 0.2], Math.PI / 2)
+    placePackProp(g, 'lamp_architect', -0.75, topY, -0.25, [0.3, 0.52, 0.34], -0.5)
+    placePackProp(g, 'keyboard', 0.1, topY, 0.25, [0.5, 0.03, 0.17], Math.PI / 2)
+    placePackProp(g, 'wireless_mouse', 0.48, topY, 0.28, [0.07, 0.035, 0.11], Math.PI / 2)
+    placePackProp(g, 'mug', -0.55, topY, 0.3, [0.08, 0.09, 0.08], 0.4)
+    placePackProp(g, 'pencil_holder', 0.85, topY, -0.2, [0.1, 0.11, 0.1], -0.2)
+  } else {
+    const top = new THREE.Mesh(
+      new RoundedBoxGeometry(2.2, 0.06, 0.9, 3, 0.03),
+      getMaterial('MAT_CHARCOAL', { roughness: 0.55 }),
+    )
+    top.position.y = 0.76
+    top.castShadow = true
+    g.add(top)
 
-  const pedestal = new THREE.Mesh(
-    new RoundedBoxGeometry(1.8, 0.7, 0.6, 2, 0.03),
-    getMaterial('MAT_ACCENT_MANAGER', { roughness: 0.6 }),
-  )
-  pedestal.position.y = 0.35
-  g.add(pedestal)
+    const pedestal = new THREE.Mesh(
+      new RoundedBoxGeometry(1.8, 0.7, 0.6, 2, 0.03),
+      getMaterial('MAT_ACCENT_MANAGER', { roughness: 0.6 }),
+    )
+    pedestal.position.y = 0.35
+    g.add(pedestal)
+  }
 
   parent.add(g)
   colliders.addAabb(nid('mdesk'), 'desk', x, 0.4, z, 2.2, 0.8, 0.9)

@@ -57,6 +57,8 @@
 
 ---
 
+
+
 # 3. 世界尺寸规范
 
 统一使用：
@@ -84,6 +86,8 @@
 方便运行时移动和生成。
 
 ---
+
+
 
 # 4. 整体地图结构
 
@@ -133,6 +137,8 @@
 
 ---
 
+
+
 # 5. 推荐坐标布局
 
 以 Open Office 中心为：
@@ -170,6 +176,8 @@ Y 为垂直方向。
 
 ---
 
+
+
 ## Printer Room
 
 中心：
@@ -199,6 +207,8 @@ Printer Room 是第一个 Puzzle Room，因此布局必须很简单。
 
 ---
 
+
+
 ## Break Room
 
 中心：
@@ -226,6 +236,8 @@ Rule #2 中 NPC 增加 Workload。
 Workload 增加后，玩家离开房间时应明显感到行动困难。
 
 ---
+
+
 
 ## Manager Office
 
@@ -270,6 +282,8 @@ Workload 增加后，玩家离开房间时应明显感到行动困难。
 
 ---
 
+
+
 ## Meeting Room / Boss Room
 
 中心：
@@ -299,6 +313,8 @@ Meeting Room 初始锁住。
 直到完成 Manager Office。
 
 ---
+
+
 
 # 6. Open Office 地编细节
 
@@ -344,6 +360,8 @@ Meeting Room 初始锁住。
 
 ---
 
+
+
 # 7. 电梯 / Spawn Area
 
 玩家起点位于：
@@ -382,6 +400,8 @@ Meeting Room 初始锁住。
 
 ---
 
+
+
 # 8. 第一轮 Visual State
 
 初始场景状态：
@@ -418,6 +438,8 @@ Palette：
 
 ---
 
+
+
 # 9. 第二轮 Visual State
 
 第一次 Rule Broken 后：
@@ -442,6 +464,8 @@ Palette：
 > 玩家意识到空间在“观察”她。
 
 ---
+
+
 
 # 10. 第三轮 Visual State
 
@@ -485,6 +509,8 @@ spawn 4–6 张桌子。
 
 ---
 
+
+
 # 11. 模块化资产清单
 
 第一版 P0 资产：
@@ -501,6 +527,8 @@ spawn 4–6 张桌子。
 - `ceiling_panel`
 - `column`
 
+
+
 ## Furniture
 
 - `desk_standard`
@@ -513,6 +541,8 @@ spawn 4–6 张桌子。
 - `break_table`
 - `sofa_or_bench`
 
+
+
 ## Gameplay
 
 - `printer`
@@ -524,6 +554,8 @@ spawn 4–6 张桌子。
 - `employee_handbook`
 - `evidence_card`
 
+
+
 ## Decoration
 
 - `plant_small`
@@ -532,6 +564,8 @@ spawn 4–6 张桌子。
 - `ceiling_light`
 - `desk_lamp`
 
+
+
 ## Characters
 
 - `npc_generic`
@@ -539,6 +573,8 @@ spawn 4–6 张桌子。
 - Rae 当前不需要可见模型
 
 ---
+
+
 
 # 12. Stylized 美术规则
 
@@ -576,6 +612,8 @@ spawn 4–6 张桌子。
 
 ---
 
+
+
 # 13. Material Palette
 
 建议暂时定义固定 Material Tokens。
@@ -599,6 +637,8 @@ MAT_GLASS
 这样后期一键换风格。
 
 ---
+
+
 
 # 14. Lighting
 
@@ -633,6 +673,8 @@ MAT_GLASS
 
 > 高对比 + 暗一档
 
+
+
 ## Meeting Room
 
 Boss 前：
@@ -644,6 +686,8 @@ Ending：
 逐渐转暖。
 
 ---
+
+
 
 # 15. Collision
 
@@ -680,6 +724,8 @@ FurnitureCollider
 避免玩家被小东西卡住。
 
 ---
+
+
 
 # 16. Navigation / Manager AI
 
@@ -723,6 +769,8 @@ Desk Island C      Desk Island D
 
 ---
 
+
+
 # 17. Manager Sightline
 
 不要让 Manager 一出门就看到全图。
@@ -747,6 +795,8 @@ Manager 进入 Open Office 后：
 Printer Room 和 Break Room 都可以短暂躲避。
 
 ---
+
+
 
 # 18. Door State
 
@@ -776,6 +826,8 @@ disabled
 
 ---
 
+
+
 # 19. Trigger Zones
 
 地图中预设：
@@ -800,6 +852,8 @@ Trigger 使用 invisible box。
 所有剧情逻辑与空间分开。
 
 ---
+
+
 
 # 20. Scene Hierarchy
 
@@ -844,6 +898,8 @@ Scene
 
 ---
 
+
+
 # 21. 场景配置数据
 
 尽量不要 hardcode 每个 Desk。
@@ -873,6 +929,8 @@ pressureDeskSlots: [...]
 
 ---
 
+
+
 # 22. Runtime Environment State API
 
 场景需预留统一状态接口。
@@ -901,6 +959,8 @@ setOfficeState("FREEDOM")
 
 ---
 
+
+
 # 23. First Pass 不要做的东西
 
 当前 Agent 不要投入时间：
@@ -924,6 +984,8 @@ setOfficeState("FREEDOM")
 
 ---
 
+
+
 # 24. Agent 第一阶段交付标准
 
 第一阶段完成后，应可以运行并做到：
@@ -942,7 +1004,11 @@ setOfficeState("FREEDOM")
 
 ---
 
+
+
 # 25. 推荐实际搭建顺序
+
+
 
 ## Pass 1 — Pure Graybox
 
@@ -964,6 +1030,8 @@ setOfficeState("FREEDOM")
 
 ---
 
+
+
 ## Pass 2 — Spatial Readability
 
 加入：
@@ -983,6 +1051,8 @@ setOfficeState("FREEDOM")
 
 ---
 
+
+
 ## Pass 3 — Stylized Look
 
 统一加入：
@@ -995,6 +1065,8 @@ setOfficeState("FREEDOM")
 - soft lighting
 
 ---
+
+
 
 ## Pass 4 — Dynamic State
 
@@ -1009,6 +1081,8 @@ setOfficeState("FREEDOM")
 Rule Broken 后场景有明显变化。
 
 ---
+
+
 
 # 26. 最关键的地编原则
 
@@ -1025,6 +1099,8 @@ Rule Broken 后场景有明显变化。
 玩家永远知道：
 
 > “我大概在哪。”
+
+
 
 ### C. 可以变得不合理
 
@@ -1045,6 +1121,8 @@ Rule Broken 后场景有明显变化。
 才会真正产生冲击。
 
 ---
+
+
 
 # 27. 一句话执行目标
 
