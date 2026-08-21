@@ -67,7 +67,7 @@ export class Engine {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5))
     this.renderer.outputColorSpace = THREE.SRGBColorSpace
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
-    this.renderer.toneMappingExposure = 1.15
+    this.renderer.toneMappingExposure = 1.35
     this.renderer.shadowMap.enabled = true
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
     host.appendChild(this.renderer.domElement)
@@ -83,8 +83,8 @@ export class Engine {
     this.player = new PlayerController(1)
     this.player.setSpawn(officeLayout.spawn.x, officeLayout.spawn.z, officeLayout.spawn.yaw)
 
-    this.hemi = new THREE.HemisphereLight(0xe8eef4, 0x5a5854, 0.55)
-    this.sun = new THREE.DirectionalLight(0xf0f4f8, 0.65)
+    this.hemi = new THREE.HemisphereLight(0xe8eef4, 0x5a5854, 0.9)
+    this.sun = new THREE.DirectionalLight(0xf0f4f8, 1.15)
     this.sun.position.set(3, 14, 1)
     this.sun.castShadow = true
     this.sun.shadow.mapSize.set(1024, 1024)

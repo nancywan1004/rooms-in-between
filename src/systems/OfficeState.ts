@@ -46,8 +46,8 @@ export class OfficeStateController {
         this.scene.fog = new THREE.FogExp2(0x8a9098, 0.022)
         this.hemi.color.setHex(0xe8eef4)
         this.hemi.groundColor.setHex(0x5a5854)
-        this.hemi.intensity = 0.55
-        this.dir.intensity = 0.65
+        this.hemi.intensity = 0.9
+        this.dir.intensity = 1.15
         this.dir.color.setHex(0xf0f4f8)
         break
       case 'STRANGE':

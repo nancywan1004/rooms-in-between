@@ -50,10 +50,10 @@ export class Game {
     this.player = new PlayerController(window.innerWidth / window.innerHeight)
     this.player.setSpawn(officeLayout.spawn.x, officeLayout.spawn.z, officeLayout.spawn.yaw)
 
-    this.hemi = new THREE.HemisphereLight(0xe8eef4, 0x5a5854, 0.55)
+    this.hemi = new THREE.HemisphereLight(0xe8eef4, 0x5a5854, 0.9)
     this.scene.add(this.hemi)
 
-    this.sun = new THREE.DirectionalLight(0xf0f4f8, 0.65)
+    this.sun = new THREE.DirectionalLight(0xf0f4f8, 1.15)
     this.sun.position.set(3, 14, 1)
     this.sun.castShadow = true
     this.sun.shadow.mapSize.set(1024, 1024)

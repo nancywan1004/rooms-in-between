@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import type { Engine } from '../../engine/Engine'
+import type { SceneGameObject } from '../../engine/SceneGameObject'
 import { listBehaviours } from '../../engine/Behaviour'
 import { CollisionComponent } from '../../engine/components/CollisionComponent'
 import { DoorComponent, type DoorAccent } from '../../engine/components/DoorComponent'
@@ -16,6 +18,15 @@ const DOOR_ACCENTS: DoorAccent[] = ['printer', 'break', 'manager', 'meeting', 'e
 const LIGHT_KINDS: LightKind[] = ['point', 'ambient', 'directional']
 const ADDABLE = ['Collision', 'Script', 'Trigger', 'Light', 'Door'] as const
 
+function collectSceneLights(engine: Engine): { go: SceneGameObject; light: LightComponent }[] {
+  const out: { go: SceneGameObject; light: LightComponent }[] = []
+  engine.scene.traverse((go) => {
+    const light = go.getComponent(LightComponent)
+    if (light) out.push({ go, light })
+  })
+  return out
+}
+
 export function Inspector() {
   const engine = useEngine()
   const go = engine?.selected ?? null
@@ -27,9 +38,12 @@ export function Inspector() {
     engine.persist()
   }
 
+  const sceneLights = collectSceneLights(engine)
+
   return (
     <aside id="inspector">
       <div className="panel-title">Inspector</div>
+      <SceneLightingSection engine={engine} lights={sceneLights} commit={commit} />
       {!go && <div className="insp-section">No selection</div>}
       {go && (
         <>
@@ -134,13 +148,141 @@ export function Inspector() {
   )
 }
 
+function SceneLightingSection({
+  engine,
+  lights,
+  commit,
+}: {
+  engine: Engine
+  lights: { go: SceneGameObject; light: LightComponent }[]
+  commit: () => void
+}) {
+  const refresh = (): void => {
+    engine.notifyChange()
+  }
+
+  return (
+    <>
+      <Section title="Scene Lighting">
+        <NumField
+          label="Hemi"
+          value={engine.hemi.intensity}
+          onCommit={(v) => {
+            engine.hemi.intensity = v
+            refresh()
+          }}
+        />
+        <ColorField
+          label="Hemi Sky"
+          value={engine.hemi.color.getHex()}
+          onCommit={(v) => {
+            engine.hemi.color.setHex(v)
+            refresh()
+          }}
+        />
+        <ColorField
+          label="Ground"
+          value={engine.hemi.groundColor.getHex()}
+          onCommit={(v) => {
+            engine.hemi.groundColor.setHex(v)
+            refresh()
+          }}
+        />
+        <NumField
+          label="Sun"
+          value={engine.sun.intensity}
+          onCommit={(v) => {
+            engine.sun.intensity = v
+            refresh()
+          }}
+        />
+        <ColorField
+          label="Sun Color"
+          value={engine.sun.color.getHex()}
+          onCommit={(v) => {
+            engine.sun.color.setHex(v)
+            refresh()
+          }}
+        />
+        <Vec3Field
+          label="Sun Pos"
+          value={[engine.sun.position.x, engine.sun.position.y, engine.sun.position.z]}
+          onCommit={(v) => {
+            engine.sun.position.set(v[0], v[1], v[2])
+            refresh()
+          }}
+        />
+        <NumField
+          label="Exposure"
+          value={engine.renderer.toneMappingExposure}
+          onCommit={(v) => {
+            engine.renderer.toneMappingExposure = v
+            refresh()
+          }}
+        />
+      </Section>
+      <Section title={`Lights (${lights.length})`}>
+        {lights.length === 0 && <div style={{ opacity: 0.55 }}>No Light components in scene</div>}
+        {lights.map(({ go, light }) => {
+          const selected = engine.selected?.uuid === go.uuid
+          return (
+            <div key={go.uuid} className={`light-row${selected ? ' selected' : ''}`}>
+              <button type="button" className="light-pick" onClick={() => engine.select(go)} title="Select in hierarchy">
+                <span className="light-name">{go.name || '(light)'}</span>
+                <span className="light-kind">{light.kind}</span>
+              </button>
+              <CheckField
+                label="On"
+                value={light.enabled}
+                onCommit={(v) => {
+                  light.enabled = v
+                  light.applyLive()
+                  commit()
+                }}
+              />
+              <NumField
+                label="Int"
+                value={light.intensity}
+                onCommit={(v) => {
+                  light.intensity = v
+                  light.applyLive()
+                  commit()
+                }}
+              />
+              <ColorField
+                label="Color"
+                value={light.color}
+                onCommit={(v) => {
+                  light.color = v
+                  light.applyLive()
+                  commit()
+                }}
+              />
+              {light.kind === 'point' && (
+                <NumField
+                  label="Dist"
+                  value={light.distance}
+                  onCommit={(v) => {
+                    light.distance = v
+                    light.applyLive()
+                    commit()
+                  }}
+                />
+              )}
+            </div>
+          )
+        })}
+      </Section>
+    </>
+  )
+}
+
 function RenderSection({ render, commit }: { render: RenderComponent; commit: () => void }) {
   return (
     <Section title="Render">
-      <NumField
+      <ColorField
         label="Color"
         value={render.color ?? 0}
-        hex
         onCommit={(v) => {
           render.color = v
           render.applyMaterialOverrides()
@@ -297,13 +439,12 @@ function LightSection({ light, commit }: { light: LightComponent; commit: () => 
           commit()
         }}
       />
-      <NumField
+      <ColorField
         label="Color"
         value={light.color}
-        hex
         onCommit={(v) => {
           light.color = v
-          light.rebuild()
+          light.applyLive()
           commit()
         }}
       />
@@ -312,7 +453,7 @@ function LightSection({ light, commit }: { light: LightComponent; commit: () => 
         value={light.intensity}
         onCommit={(v) => {
           light.intensity = v
-          light.rebuild()
+          light.applyLive()
           commit()
         }}
       />
@@ -321,7 +462,16 @@ function LightSection({ light, commit }: { light: LightComponent; commit: () => 
         value={light.distance}
         onCommit={(v) => {
           light.distance = v
-          light.rebuild()
+          light.applyLive()
+          commit()
+        }}
+      />
+      <CheckField
+        label="Enabled"
+        value={light.enabled}
+        onCommit={(v) => {
+          light.enabled = v
+          light.applyLive()
           commit()
         }}
       />
@@ -417,16 +567,51 @@ function CheckField({
   )
 }
 
-function NumField({
+function toHexColor(n: number): string {
+  const v = Math.max(0, Math.min(0xffffff, Math.round(n))) >>> 0
+  return `#${v.toString(16).padStart(6, '0')}`
+}
+
+function fromHexColor(hex: string): number {
+  const cleaned = hex.replace('#', '')
+  const n = Number.parseInt(cleaned, 16)
+  return Number.isFinite(n) ? n : 0
+}
+
+function ColorField({
   label,
   value,
   onCommit,
-  hex = false,
 }: {
   label: string
   value: number
   onCommit: (v: number) => void
-  hex?: boolean
+}) {
+  const hex = toHexColor(value)
+  return (
+    <div className="insp-row">
+      <label>{label}</label>
+      <div className="color-field">
+        <input
+          type="color"
+          value={hex}
+          onChange={(e) => onCommit(fromHexColor(e.target.value))}
+          title={hex}
+        />
+        <span className="color-hex">{hex}</span>
+      </div>
+    </div>
+  )
+}
+
+function NumField({
+  label,
+  value,
+  onCommit,
+}: {
+  label: string
+  value: number
+  onCommit: (v: number) => void
 }) {
   const [text, setText] = useState(String(value))
   const focused = useRef(false)
@@ -443,7 +628,7 @@ function NumField({
       <label>{label}</label>
       <input
         type="number"
-        step={hex ? '1' : '0.01'}
+        step="0.01"
         value={text}
         onFocus={() => {
           focused.current = true

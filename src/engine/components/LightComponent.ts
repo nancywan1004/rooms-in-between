@@ -26,7 +26,22 @@ export class LightComponent extends Component {
       this.light = new THREE.PointLight(this.color, this.intensity, this.distance, 2)
     }
     this.light.castShadow = false
+    this.light.visible = this.enabled
     this.gameObject.node.add(this.light)
+  }
+
+  /** Update an existing Three light without recreating it. */
+  applyLive(): void {
+    if (!this.light) {
+      this.rebuild()
+      return
+    }
+    this.light.color.setHex(this.color)
+    this.light.intensity = this.intensity
+    this.light.visible = this.enabled
+    if (this.light instanceof THREE.PointLight) {
+      this.light.distance = this.distance
+    }
   }
 
   private clear(): void {
